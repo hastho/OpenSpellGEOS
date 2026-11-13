@@ -331,10 +331,25 @@ static int OL_CALL olMorphPart(OLContext *lexP, const unsigned char *partP,
     unsigned short stemLength;
     int probe;
 
+    /* Direct case probe. */
     probe = olMorphProbe(lexP, partP, length, workP->probe);
     if (probe != 0) {
         return probe;
     }
+    /* Try one noun ending strip for compound parts: plural -e, dative -n
+     * or genitive -s. For example, "attribute" strips to "attribut". */
+    if (length > OL_MORPH_MIN_PART + 1 &&
+        (partP[length - 1] == 'e' || partP[length - 1] == 'n' ||
+         partP[length - 1] == 's')) {
+        stemLength = length - 1;
+        olMorphCopy(partP, workP->probe, stemLength);
+        probe = olMorphProbe(lexP, workP->probe, stemLength,
+                             workP->candidate);
+        if (probe != 0) {
+            return probe;
+        }
+    }
+    /* Try one linking-element strip on the left part. */
     if (!allowLink || length < 5) {
         return 0;
     }

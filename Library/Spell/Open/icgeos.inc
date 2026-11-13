@@ -452,6 +452,10 @@ int _pascal OpenEdgePunctuation(unsigned char letter)
            letter == ':' || letter == ';' || letter == '(' || letter == ')' ||
            letter == '[' || letter == ']' || letter == '{' || letter == '}' ||
            letter == '"' || letter == '\'' || letter == ' ' ||
+           letter == '<' || letter == '>' || letter == '=' ||
+           letter == '+' || letter == '#' || letter == '*' ||
+           letter == '&' || letter == '%' || letter == '@' ||
+           letter == '|' || letter == '~' || letter == '`' ||
            letter == 0xc7 || letter == 0xc8 || letter == 0xc9 ||
            (letter >= 0xd0 && letter <= 0xd5);
 }
@@ -588,7 +592,7 @@ word _pascal _export ICGEOSpl(const unsigned char *sourceP, MemHandle bufferH)
     word result;
     unsigned char flag;
     int found;
-    int numeric;
+    int hasAlpha;
     int lookup;
     bufferP = (ICBuff *)MemLock(bufferH);
     contextH = bufferP->ICB_hctlBuff;
@@ -633,36 +637,44 @@ word _pascal _export ICGEOSpl(const unsigned char *sourceP, MemHandle bufferH)
         bufferP->ICB_lside = left;
         /* Existing assembly expects the inclusive index of the last byte. */
         bufferP->ICB_rside = length ? right - 1 : left;
-        bufferP->ICB_len = length;
-        numeric = length != 0;
-        for (index = 0; index < length; ++index) {
-            flag = sourceP[left + index];
+        hasAlpha = 0;
+        length = 0;
+        for (index = left; index < right; ++index) {
+            flag = sourceP[index];
             /* GEOS smart apostrophes occupy one byte, as does ASCII quote. */
             if (flag == 0xd5) {
                 flag = '\'';
             }
-            bufferP->ICB_word[index] = flag;
-            contextP->folded[index] = olLower(flag);
-            if (flag < '0' || flag > '9') {
-                numeric = 0;
+            /* Skip hyphenation hyphens, line breaks and GEOS dashes so that
+             * words split across a line break are joined before lookup. */
+            if (flag == '-' || flag == 0x0d || flag == 0x0a ||
+                (flag >= 0xd0 && flag <= 0xd5)) {
+                if (flag == '-' || (flag >= 0xd0 && flag <= 0xd5)) {
+                    bufferP->ICB_hyphenMap.WM_data[0] = 1;
+                }
+                if (flag == 0xd1 || flag == 0xd0) {
+                    bufferP->ICB_emDashMap.WM_data[0] = 1;
+                }
+                continue;
             }
             if (flag == '/') {
                 bufferP->ICB_slashMap.WM_data[0] = 1;
             }
-            if (flag == '-') {
-                bufferP->ICB_hyphenMap.WM_data[0] = 1;
-            }
-            if (flag == 0xd1 || flag == 0xd0) {
-                bufferP->ICB_emDashMap.WM_data[0] = 1;
-            }
             if (flag == 0xc9) {
                 bufferP->ICB_elDashMap.WM_data[0] = 1;
             }
+            if (olUpper(flag) != flag || olLower(flag) != flag) {
+                hasAlpha = 1;
+            }
+            bufferP->ICB_word[length] = flag;
+            contextP->folded[length] = olLower(flag);
+            ++length;
         }
         bufferP->ICB_word[length] = 0;
         contextP->folded[length] = 0;
+        bufferP->ICB_len = length;
         result = OPEN_NOT_FOUND;
-        if (!length || numeric) {
+        if (!length || !hasAlpha) {
             result = OPEN_PRE_PROC;
         } else if (bufferP->ICB_task != OPEN_VERIFY) {
             /* ATTENTION: wildcard/anagram enumeration is not implemented. */
