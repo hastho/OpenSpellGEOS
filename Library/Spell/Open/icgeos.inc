@@ -645,14 +645,15 @@ word _pascal _export ICGEOSpl(const unsigned char *sourceP, MemHandle bufferH)
             if (flag == 0xd5) {
                 flag = '\'';
             }
-            /* Skip hyphenation hyphens, soft hyphens, non-breaking spaces,
-             * non-breaking hyphens, line breaks and GEOS dashes so that
-             * words split across a line break or carrying leftover hyphenation
-             * marks are joined before lookup. */
-            if (flag == '-' || flag == 0x0d || flag == 0x0a ||
+            /* Skip soft hyphens, non-breaking spaces, non-breaking hyphens,
+             * line breaks and GEOS dashes so that words split across a line
+             * break or carrying leftover hyphenation marks are joined before
+             * lookup. ASCII hyphens are kept as delimiters for English-style
+             * compound words like "GeoWrite-Tutorial". */
+            if (flag == 0x0d || flag == 0x0a ||
                 flag == 0x1e || flag == 0x1f || flag == 0xca ||
                 (flag >= 0xd0 && flag <= 0xd5)) {
-                if (flag == '-' || (flag >= 0xd0 && flag <= 0xd5)) {
+                if (flag >= 0xd0 && flag <= 0xd5) {
                     bufferP->ICB_hyphenMap.WM_data[0] = 1;
                 }
                 if (flag == 0xd1 || flag == 0xd0) {
@@ -727,6 +728,71 @@ word _pascal _export ICGEOSpl(const unsigned char *sourceP, MemHandle bufferH)
                         lookup = olMorphCheck(&contextP->dictionary.lex,
                                               contextP->folded, length,
                                               &contextP->morph);
+                    }
+                    if (!lookup) {
+                        /* Accept English-style hyphenated compounds when
+                         * every hyphen-delimited segment is a known word in
+                         * the main dictionary, the morphology analyzer or the
+                         * user dictionary. Each segment is copied into a
+                         * null-terminated buffer because OpenUserContains
+                         * compares by null-termination. */
+                        unsigned short segStart = 0;
+                        unsigned short segEnd;
+                        unsigned short segLen;
+                        unsigned short si;
+                        unsigned char segFlag;
+                        unsigned short segValueLen;
+                        int segOk = 1;
+                        int segFound;
+                        for (segStart = 0; segStart < length && segOk; ) {
+                            segEnd = segStart;
+                            while (segEnd < length &&
+                                   contextP->folded[segEnd] != '-') {
+                                ++segEnd;
+                            }
+                            segLen = segEnd - segStart;
+                            if (segLen == 0 || segLen > 64) {
+                                segOk = 0;
+                                break;
+                            }
+                            segFound = olFind(
+                                &contextP->dictionary.lex,
+                                contextP->folded + segStart,
+                                segLen, &segFlag, 1, &segValueLen);
+                            if (segFound == 1 && segValueLen == 1 &&
+                                (segFlag == OL_FOLD_CASE ||
+                                 segFlag == OL_EXACT_CASE)) {
+                                /* Found in main dictionary */
+                            } else {
+                                segFound = olMorphCheck(
+                                    &contextP->dictionary.lex,
+                                    contextP->folded + segStart,
+                                    segLen, &contextP->morph);
+                                if (segFound != 1) {
+                                    /* Copy segment into a null-terminated
+                                     * buffer for the user-dict check. */
+                                    for (si = 0; si < segLen; ++si) {
+                                        contextP->morph.part[si] =
+                                            contextP->folded[segStart + si];
+                                    }
+                                    contextP->morph.part[segLen] = 0;
+                                    ThreadPSem(spellSem);
+                                    usersP = (OpenUserDictionary *)
+                                        MemLock(openUsersH);
+                                    segFound = OpenUserContains(
+                                        usersP, contextP->morph.part);
+                                    MemUnlock(openUsersH);
+                                    ThreadVSem(spellSem);
+                                    if (!segFound) {
+                                        segOk = 0;
+                                    }
+                                }
+                            }
+                            segStart = segEnd + 1;
+                        }
+                        if (segOk && segStart >= length) {
+                            lookup = 1;
+                        }
                     }
                     result = lookup < 0 ? OPEN_ERROR :
                              (lookup ? OPEN_FOUND : OPEN_NOT_FOUND);
