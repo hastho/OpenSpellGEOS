@@ -645,9 +645,12 @@ word _pascal _export ICGEOSpl(const unsigned char *sourceP, MemHandle bufferH)
             if (flag == 0xd5) {
                 flag = '\'';
             }
-            /* Skip hyphenation hyphens, line breaks and GEOS dashes so that
-             * words split across a line break are joined before lookup. */
+            /* Skip hyphenation hyphens, soft hyphens, non-breaking spaces,
+             * non-breaking hyphens, line breaks and GEOS dashes so that
+             * words split across a line break or carrying leftover hyphenation
+             * marks are joined before lookup. */
             if (flag == '-' || flag == 0x0d || flag == 0x0a ||
+                flag == 0x1e || flag == 0x1f || flag == 0xca ||
                 (flag >= 0xd0 && flag <= 0xd5)) {
                 if (flag == '-' || (flag >= 0xd0 && flag <= 0xd5)) {
                     bufferP->ICB_hyphenMap.WM_data[0] = 1;
