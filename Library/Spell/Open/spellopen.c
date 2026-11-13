@@ -23,6 +23,7 @@
 #pragma code_seg("OpenLexCode")
 #endif
 #include "openlex.inc"
+#include "openmorph.inc"
 #include "geosbridge.inc"
 #include "icgeos.inc"
 #include "openht.inc"

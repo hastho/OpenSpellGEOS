@@ -73,6 +73,7 @@ typedef struct {
     unsigned char folded[65];
     OLSuggestWorkspace suggestions;
     unsigned char suggestionWords[ICCORMAX];
+    OLMorphWorkspace morph;
 } OpenSpellContext;
 
 /* Keep the reader cache and all per-client scratch below the GEOS budget. */
@@ -706,6 +707,11 @@ word _pascal _export ICGEOSpl(const unsigned char *sourceP, MemHandle bufferH)
                                 lookup = 0;
                             }
                         }
+                    }
+                    if (!lookup) {
+                        lookup = olMorphCheck(&contextP->dictionary.lex,
+                                              contextP->folded, length,
+                                              &contextP->morph);
                     }
                     result = lookup < 0 ? OPEN_ERROR :
                              (lookup ? OPEN_FOUND : OPEN_NOT_FOUND);
