@@ -27,6 +27,7 @@
 #define OL_MORPH_MIN_STEM 3
 #define OL_MORPH_MIN_PART 3
 #define OL_MORPH_MAX_ENDING 7
+#define OL_MORPH_LANG_GERMAN 6
 
 /* Caller-owned scratch. One context is used serially by one caller. */
 typedef struct {
@@ -363,36 +364,39 @@ static int OL_CALL olMorphScanParticiple(OLContext *lexP,
 /* Run the suffix and ending scans once. depth guards the un- recursion. */
 static int OL_CALL olMorphScanInner(OLContext *lexP, const unsigned char *wordP,
                                     unsigned short length, OLMorphWorkspace *workP,
-                                    unsigned short depth)
+                                    unsigned short depth, unsigned char language)
 {
     int probe;
 
-    probe = olMorphScanBar(lexP, wordP, length, workP);
-    if (probe != 0) {
-        return probe;
-    }
-    probe = olMorphScanUng(lexP, wordP, length, workP);
-    if (probe != 0) {
-        return probe;
-    }
-    probe = olMorphScanKeit(lexP, wordP, length, workP);
-    if (probe != 0) {
-        return probe;
-    }
-    probe = olMorphScanHeit(lexP, wordP, length, workP);
-    if (probe != 0) {
-        return probe;
-    }
-    probe = olMorphScanParticiple(lexP, wordP, length, workP);
-    if (probe != 0) {
-        return probe;
-    }
-    probe = olMorphScanEndings(lexP, wordP, length, workP);
-    if (probe != 0) {
-        return probe;
+    if (language == OL_MORPH_LANG_GERMAN) {
+        probe = olMorphScanBar(lexP, wordP, length, workP);
+        if (probe != 0) {
+            return probe;
+        }
+        probe = olMorphScanUng(lexP, wordP, length, workP);
+        if (probe != 0) {
+            return probe;
+        }
+        probe = olMorphScanKeit(lexP, wordP, length, workP);
+        if (probe != 0) {
+            return probe;
+        }
+        probe = olMorphScanHeit(lexP, wordP, length, workP);
+        if (probe != 0) {
+            return probe;
+        }
+        probe = olMorphScanParticiple(lexP, wordP, length, workP);
+        if (probe != 0) {
+            return probe;
+        }
+        probe = olMorphScanEndings(lexP, wordP, length, workP);
+        if (probe != 0) {
+            return probe;
+        }
     }
     if (depth == 0 && length >= 5 && wordP[0] == 'u' && wordP[1] == 'n') {
-        probe = olMorphScanInner(lexP, wordP + 2, length - 2, workP, 1);
+        probe = olMorphScanInner(lexP, wordP + 2, length - 2, workP, 1,
+                                 language);
         if (probe != 0) {
             return probe;
         }
@@ -481,18 +485,23 @@ static int OL_CALL olMorphCompound(OLContext *lexP, const unsigned char *wordP,
     return 0;
 }
 
-/* Public entry. wordP is the folded lowercase spelling. Returns one when a
- * bounded reconstruction finds a stored base, zero when the spelling stays
- * unknown, -1 on malformed data or I/O failure. */
+/* Public entry. wordP is the folded lowercase spelling. language is the
+ * GEOS StandardLanguage code from the active dictionary. German-specific
+ * rules (inflectional endings, -bar, -ung, -keit, -heit, separable-prefix
+ * participles, de-umlaut) run only for SL_GERMAN (6). The compound splitter
+ * and the un- prefix are language-agnostic. Returns one when a bounded
+ * reconstruction finds a stored base, zero when the spelling stays unknown,
+ * -1 on malformed data or I/O failure. */
 int OL_CALL olMorphCheck(OLContext *lexP, const unsigned char *wordP,
-                         unsigned short length, OLMorphWorkspace *workP)
+                         unsigned short length, OLMorphWorkspace *workP,
+                         unsigned char language)
 {
     int probe;
 
     if (length < OL_MORPH_MIN_WORD || length > OL_KEY_MAX) {
         return 0;
     }
-    probe = olMorphScanInner(lexP, wordP, length, workP, 0);
+    probe = olMorphScanInner(lexP, wordP, length, workP, 0, language);
     if (probe != 0) {
         return probe;
     }
