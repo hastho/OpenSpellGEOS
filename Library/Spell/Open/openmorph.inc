@@ -255,6 +255,72 @@ static int OL_CALL olMorphScanBar(OLContext *lexP, const unsigned char *wordP,
                       workP->candidate, workP->probe);
 }
 
+/* Accept V+-ung nouns through a reconstructed verb infinitive:
+ * strip -ung, then probe stem+en and stem+n. The noun is capitalized
+ * in German; the title-case probe handles that. Returns one on a hit,
+ * zero on absence, -1 on error. */
+static int OL_CALL olMorphScanUng(OLContext *lexP, const unsigned char *wordP,
+                                  unsigned short length, OLMorphWorkspace *workP)
+{
+    unsigned short stemLength;
+    int probe;
+
+    if (length < 6 || wordP[length - 3] != 'u' || wordP[length - 2] != 'n' ||
+        wordP[length - 1] != 'g' || length - 3 < OL_MORPH_MIN_STEM) {
+        return 0;
+    }
+    stemLength = length - 3;
+    probe = olMorphTry(lexP, wordP, stemLength, "en", 2,
+                       workP->candidate, workP->probe);
+    if (probe != 0) {
+        return probe;
+    }
+    return olMorphTry(lexP, wordP, stemLength, "n", 1,
+                      workP->candidate, workP->probe);
+}
+
+/* Accept A+-keit nouns through a reconstructed adjective base:
+ * strip -keit, then probe the stem directly and stem+ig. Returns one
+ * on a hit, zero on absence, -1 on error. */
+static int OL_CALL olMorphScanKeit(OLContext *lexP, const unsigned char *wordP,
+                                   unsigned short length, OLMorphWorkspace *workP)
+{
+    unsigned short stemLength;
+    int probe;
+
+    if (length < 7 || wordP[length - 4] != 'k' || wordP[length - 3] != 'e' ||
+        wordP[length - 2] != 'i' || wordP[length - 1] != 't' ||
+        length - 4 < OL_MORPH_MIN_STEM) {
+        return 0;
+    }
+    stemLength = length - 4;
+    probe = olMorphTry(lexP, wordP, stemLength, "", 0,
+                       workP->candidate, workP->probe);
+    if (probe != 0) {
+        return probe;
+    }
+    return olMorphTry(lexP, wordP, stemLength, "ig", 2,
+                      workP->candidate, workP->probe);
+}
+
+/* Accept A+-heit nouns through a reconstructed adjective base:
+ * strip -heit, then probe the stem directly. Returns one on a hit,
+ * zero on absence, -1 on error. */
+static int OL_CALL olMorphScanHeit(OLContext *lexP, const unsigned char *wordP,
+                                   unsigned short length, OLMorphWorkspace *workP)
+{
+    unsigned short stemLength;
+
+    if (length < 7 || wordP[length - 4] != 'h' || wordP[length - 3] != 'e' ||
+        wordP[length - 2] != 'i' || wordP[length - 1] != 't' ||
+        length - 4 < OL_MORPH_MIN_STEM) {
+        return 0;
+    }
+    stemLength = length - 4;
+    return olMorphTry(lexP, wordP, stemLength, "", 0,
+                      workP->candidate, workP->probe);
+}
+
 /* Reconstruct separable-prefix participles: prefix+ge+rest probes the
  * infinitive prefix+rest when the participle marker is removable. Returns
  * one on a hit, zero on absence, -1 on error. */
@@ -302,6 +368,18 @@ static int OL_CALL olMorphScanInner(OLContext *lexP, const unsigned char *wordP,
     int probe;
 
     probe = olMorphScanBar(lexP, wordP, length, workP);
+    if (probe != 0) {
+        return probe;
+    }
+    probe = olMorphScanUng(lexP, wordP, length, workP);
+    if (probe != 0) {
+        return probe;
+    }
+    probe = olMorphScanKeit(lexP, wordP, length, workP);
+    if (probe != 0) {
+        return probe;
+    }
+    probe = olMorphScanHeit(lexP, wordP, length, workP);
     if (probe != 0) {
         return probe;
     }
