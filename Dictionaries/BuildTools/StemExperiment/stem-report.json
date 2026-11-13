@@ -1,0 +1,88 @@
+{
+ "voc": "/home/thomas/OpenSpellGEOS/Dictionaries/BuildTools/Data/DE.words.txt",
+ "max_bytes": 1000000,
+ "raw_lines": 2152637,
+ "lowercase_forms": 2152632,
+ "stems": {
+  "distinct": 804103,
+  "forms": 2152632,
+  "held_forms": 215264
+ },
+ "surface": {
+  "selection": {
+   "policy": "priority-prefix-bounded-size-search-v1",
+   "candidate_records": 2152637,
+   "ranking_considered": 187272,
+   "selected_records": 130397,
+   "omitted_records": 2022240,
+   "priority_hit_records": 73126,
+   "max_bytes": 1000000,
+   "estimated_bytes": 999766,
+   "optimality": "largest fitting tested prefix; not a global maximum claim"
+  },
+  "shipped_bytes": 999766,
+  "shipped_sha256": "8daf912f2d8afc55caf92e5132eb9267697eb3dac7f1a6e7f16a987b6981e12b",
+  "replication_exact": false
+ },
+ "builds": {
+  "all_forms_entries": 2152637,
+  "stems_selected_bytes": 471601,
+  "stems_selected_sha256": "dca8ba330f0525736a4bae5ba0328397740bb370f187021da2bedf50be299ed0",
+  "all_forms_bytes": 18287641,
+  "all_forms_entries_written": 2152637,
+  "all_stems_distinct": 804103,
+  "all_stems_unencodable": 0,
+  "all_stems_bytes": 8091334,
+  "all_stems_entries_written": 804103
+ },
+ "stemset": {
+  "selected_texts": 130397,
+  "lower_forms": 69703,
+  "stems_all": 58073,
+  "unencodable_stems": 0
+ },
+ "recall": {
+  "held_forms": 215264,
+  "covered": 194057,
+  "recall_percent": 90.14837594767356
+ },
+ "false_accepts": {
+  "deletion": {
+   "generated": 25000,
+   "true_accept": 1575,
+   "false_accept": 3171,
+   "false_accept_lower_only": 1508,
+   "skipped": 0
+  },
+  "substitution": {
+   "generated": 25000,
+   "true_accept": 141,
+   "false_accept": 704,
+   "false_accept_lower_only": 352,
+   "skipped": 0
+  },
+  "transposition": {
+   "generated": 24990,
+   "true_accept": 62,
+   "false_accept": 751,
+   "false_accept_lower_only": 443,
+   "skipped": 10
+  },
+  "doubled": {
+   "generated": 25000,
+   "true_accept": 17,
+   "false_accept": 100,
+   "false_accept_lower_only": 35,
+   "skipped": 0
+  },
+  "lower_forms": 69703,
+  "candidates": 130394
+ },
+ "coverage": {
+  "forms": 2152632,
+  "exact_covered": 69703,
+  "exact_percent": 3.238036041459943,
+  "stem_covered": 247768,
+  "stem_percent": 11.51000263863029
+ }
+}
