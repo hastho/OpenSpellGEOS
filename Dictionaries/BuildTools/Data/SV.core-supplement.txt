@@ -1,0 +1,17 @@
+# OpenSpellGEOS authored Swedish common-word supplement.
+# SPDX-License-Identifier: Apache-2.0
+# These standard forms are absent from the pinned NST source.
+det
+i
+som
+på
+den
+av
+de
+efter
+alla
+någon
+detta
+där
+få
+bra
