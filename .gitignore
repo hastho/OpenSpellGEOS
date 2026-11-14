@@ -11,3 +11,7 @@ Examples/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Generated HTML and PDF documents
+TechDocs/HTML/
+TechDocs/PDF/
