@@ -121,13 +121,59 @@ priority because the analyzer validates compounds at runtime.
 
 | File | Records | Bytes |
 | --- | ---: | ---: |
-| DE_DE.DCT | 116,848 | 999,766 |
-| DE_DE.HYP | 103,126 | 999,766 |
+| DE_DE.DCT | 162,329 | 1,499,617 |
+| DE_DE.HYP | 139,479 | 1,499,617 |
 
-The DCT and HYP are at the 1,000,000-byte budget. The THS and GDI files
+The DCT and HYP are at the 1,500,000-byte budget. The THS and GDI files
 are unchanged. The ranking uses only the pinned Free German Dictionary
 snapshot and original morphology rules. No external corpus or
 copyleft-licensed data is used.
+
+### Rebuild tool
+
+The script `Dictionaries/BuildTools/rebuild_german.py` automates the
+morphology-aware rebuild. It requires the extracted Data snapshot
+(`Dictionaries/BuildTools/Data/`) and produces `DE_DE.DCT` and `DE_DE.HYP`.
+
+```text
+python3 Dictionaries/BuildTools/rebuild_german.py --budget 1500000
+```
+
+The `--budget` option sets the per-file byte ceiling. The sweet-spot
+analysis recommends 1,500,000 bytes for German. The script rebuilds the
+priority file with the morphology-core ranking, selects the fitting prefix,
+writes the DCT, regenerates the HYP from the selected vocabulary, and
+removes its temporary files.
+
+### Corpus coverage tool
+
+The script `Dictionaries/BuildTools/corpus_coverage.py` extracts words
+from a directory of text or HTML files and writes a frequency-sorted
+mac_roman word list. The output is used to measure dictionary coverage
+against real-world text.
+
+```text
+python3 Dictionaries/BuildTools/corpus_coverage.py \
+    --input ~/mirror/heise \
+    --pattern art.htm \
+    --encoding iso-8859-1 \
+    --sample 500 \
+    --output corpus_words.txt
+```
+
+The output file can be read by a C test program that links the OLX1
+reader and the morphology analyzer, measuring the acceptance rate of
+the combined exact, folded and morphology paths. The sweet-spot curve
+for the German DCT budget is:
+
+| Budget (bytes) | Records | Corpus recall | Notes |
+| ---: | ---: | ---: | --- |
+| 500,000 | 61,535 | 35.4 percent | Core vocabulary only |
+| 750,000 | 90,060 | 42.2 percent | Common words fill in |
+| 1,000,000 | 116,878 | 44.8 percent | Shipped size |
+| **1,500,000** | **162,329** | **47.2 percent** | **Sweet spot** |
+| 2,000,000 | 212,818 | 47.9 percent | Diminishing returns |
+| 3,000,000 | 325,540 | 55.7 percent | Mostly English loanwords |
 
 ## Runtime cost
 

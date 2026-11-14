@@ -380,6 +380,42 @@ installed counts when describing the binary release; source counts can differ
 because canonical keys merge during case folding and the compact selector
 omits records to satisfy the per-file byte budget.
 
+## Morphology-aware rebuild and corpus analysis
+
+Two additional tools in `Dictionaries/BuildTools` support the morphology-aware
+rebuild described in `TechDocs/Markdown/OpenSpellGEOSMorphology.md`:
+
+### rebuild_german.py
+
+Rebuilds `DE_DE.DCT` and `DE_DE.HYP` with a morphology-aware ranking that
+selects base forms rather than surface forms. The ranking identifies cores:
+attested forms whose morphology family has at least four attested relatives
+for lowercase forms or two for capitalized nouns. The tool requires the
+extracted Data snapshot.
+
+```text
+python3 Dictionaries/BuildTools/rebuild_german.py --budget 1500000
+```
+
+The `--budget` option sets the per-file byte ceiling. The sweet-spot analysis
+recommends 1,500,000 bytes for German.
+
+### corpus_coverage.py
+
+Extracts words from a directory of text or HTML files, converts them to
+GEOS mac_roman encoding, and writes a frequency-sorted word list for
+coverage measurement.
+
+```text
+python3 Dictionaries/BuildTools/corpus_coverage.py \
+    --input ~/mirror/heise --pattern art.htm \
+    --encoding iso-8859-1 --sample 500 --output corpus_words.txt
+```
+
+The output file can be read by a C test program that links the OLX1 reader
+and the morphology analyzer to measure the acceptance rate of the combined
+exact, folded and morphology paths against real-world text.
+
 # Reproducing normalized snapshots from upstream
 
 The host needs Python 3 and 7z, 7zz or bsdtar for the German source archive.
