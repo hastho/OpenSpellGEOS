@@ -29,6 +29,49 @@
 #define OL_MORPH_MAX_ENDING 7
 #define OL_MORPH_LANG_GERMAN 6
 
+/* Auxiliary and modal verb forms that cannot be derived by rules.
+ * Each entry stores the infinitive and a set of irregular surface forms.
+ * The analyzer checks the unknown word against all stored forms; a match
+ * accepts the word. Forms are stored as mac_roman byte strings. */
+static const char * const olMorphAuxForms[] = {
+    /* sein */
+    "bin", "bist", "ist", "sind", "seid", "war", "warst", "waren",
+    "wart", "gewesen", "sei", "seist", "seien", "seid", "wäre",
+    "wären", "wärest", "wär", "wärst",
+    /* haben */
+    "hat", "hast", "hatte", "hattest", "hatten", "hattet", "gehabt",
+    "hätte", "hättest", "hätten", "hättet",
+    /* werden */
+    "wird", "werde", "werdest", "wurde", "wurdest", "wurden", "wurdet",
+    "geworden", "würde", "würdest", "würden", "würdet",
+    /* können */
+    "kann", "kannst", "könnt", "könnte", "könntest", "könnten", "könntet",
+    "gekonnt", "könne", "könnet",
+    /* dürfen */
+    "darf", "darfst", "dürft", "dürfte", "dürftest", "dürften", "dürftet",
+    "gedurft", "dürfe", "dürfet",
+    /* mögen */
+    "mag", "magst", "mögt", "mochte", "mochtest", "mochten", "mochtet",
+    "gemocht", "möchte", "möchtest", "möchten", "möchtet",
+    /* müssen */
+    "muss", "musst", "müsst", "musste", "musstest", "mussten", "musstet",
+    "gemusst", "müsse", "müsset", "müsste", "müssten",
+    /* sollen */
+    "soll", "sollst", "sollt", "sollte", "solltest", "sollten", "solltet",
+    "gesollt", "solle", "sollet",
+    /* wollen */
+    "will", "willst", "wollt", "wollte", "wolltest", "wollten", "wolltet",
+    "gewollt", "wolle", "wollet",
+    /* wissen */
+    "weiß", "weißt", "wusste", "wusstest", "wussten", "wusstet",
+    "gewusst", "wisse", "wisst", "wüsste", "wüssten"
+};
+#define OL_MORPH_AUX_COUNT \
+    ((unsigned short)(sizeof(olMorphAuxForms) / sizeof(olMorphAuxForms[0])))
+/* The aux table is static const in the code segment, not in the heap.
+ * This check ensures it stays compact. */
+typedef char OlMorphAuxSizeCheck[(sizeof(olMorphAuxForms) <= 2048) ? 1 : -1];
+
 /* Caller-owned scratch. One context is used serially by one caller. */
 typedef struct {
     unsigned char candidate[OL_KEY_MAX + 1];
@@ -36,6 +79,38 @@ typedef struct {
     unsigned char probe[OL_KEY_MAX + 1];
     unsigned char inner[OL_KEY_MAX + 1];
 } OLMorphWorkspace;
+
+/* Check if the unknown word matches an auxiliary or modal verb form.
+ * The table stores irregular surface forms (mac_roman bytes) that cannot
+ * be derived by the general morphology rules. German-only. Returns one
+ * if the word matches a known aux/modal form, zero otherwise. */
+static int OL_CALL olMorphScanAux(OLContext *lexP,
+                                  const unsigned char *wordP,
+                                  unsigned short length,
+                                  OLMorphWorkspace *workP)
+{
+    unsigned short i;
+    const char *form;
+    unsigned short formLen;
+
+    (void)lexP;
+    (void)workP;
+    for (i = 0; i < OL_MORPH_AUX_COUNT; ++i) {
+        form = olMorphAuxForms[i];
+        formLen = 0;
+        while (form[formLen] != 0) {
+            ++formLen;
+        }
+        if (formLen != length) {
+            continue;
+        }
+        if (olCompare(wordP, length,
+                       (const unsigned char *)form, formLen) == 0) {
+            return 1;
+        }
+    }
+    return 0;
+}
 
 /* Inflectional, preterite and participle endings, longest first. Plain
  * endings only; productive derivational suffixes other than -bar stay out
@@ -369,6 +444,10 @@ static int OL_CALL olMorphScanInner(OLContext *lexP, const unsigned char *wordP,
     int probe;
 
     if (language == OL_MORPH_LANG_GERMAN) {
+        probe = olMorphScanAux(lexP, wordP, length, workP);
+        if (probe != 0) {
+            return probe;
+        }
         probe = olMorphScanBar(lexP, wordP, length, workP);
         if (probe != 0) {
             return probe;
