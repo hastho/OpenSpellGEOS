@@ -132,16 +132,16 @@ GEOS.INI keinen `language`-Eintrag enthält.
 
 ## Messergebnisse
 
-### Korpus-Test (heise-Magazin, 500 Artikel, 74.380 eindeutige Wörter)
+### Korpus-Test (heise-Magazin, 500 Artikel, 74.380 eindeutige Wörter, 707.708 Token)
 
-| Wörterbuchgröße | Datensätze | Typen-Trefferquote | Token-Trefferquote | Quelle |
-|---:|---:|---:|---:|---|
-| 500 KB | 61.535 | 35,4 % | — | Nur Basis |
-| 750 KB | 90.060 | 42,2 % | — | |
-| 1.000 KB | 116.878 | 44,8 % | — | Ursprüngliche Größe |
-| **1.500 KB** | **162.467** | **49,6 %** | **76,4 %** | **Gewählter Sweet Spot** |
-| 2.000 KB | 212.818 | 47,9 % | — | Sinkender Nutzen |
-| 3.000 KB | 325.540 | 55,7 % | — | Hauptsächlich englische Lehnwörter |
+| Wörterbuchgröße | Datensätze | Typen-Trefferquote | Token-Trefferquote | Exact/Folded | Morphologie |
+|---:|---:|---:|---:|---:|---:|
+| 500 KB | 61.535 | 35,8 % | 69,2 % | 7.874 | 18.748 |
+| 750 KB | 90.074 | 44,6 % | 74,9 % | 11.175 | 22.032 |
+| 1.000 KB | 117.045 | 47,2 % | 75,7 % | 12.548 | 22.540 |
+| **1.500 KB** | **162.467** | **49,6 %** | **76,5 %** | **13.119** | **23.781** |
+| 2.000 KB | 213.059 | 50,3 % | 76,6 % | 13.142 | 24.244 |
+| 3.000 KB | 325.491 | 56,4 % | 80,2 % | 14.486 | 27.488 |
 
 Der Sweet Spot bei 1,5 MB liegt innerhalb eines typischen DOS-Plattenpuffers
 (SmartDrive, 2 MB Standard) und funktioniert daher auch auf alter Hardware.
