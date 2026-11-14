@@ -24,7 +24,7 @@ Komposita wie *Schriftgröße* fälschlich als falsch markiert wurden.
 
 ### 1. Morphologie-Analyse zur Laufzeit
 
-Eine neue C89-Bibliothek (`openmorph.inc`, ca. 500 Zeilen) wurde in die
+Eine neue C89-Bibliothek (`openmorph.inc`, ca. 680 Zeilen) wurde in die
 Spell-Bibliothek integriert. Sie akzeptiert ein unbekanntes Wort, wenn eine
 begrenzte Regelsequenz eine im Wörterbuch gespeicherte Basisform
 rekonstruiert. Alle Regeln prüfen Kandidaten gegen das Wörterbuch — es wird
@@ -32,38 +32,71 @@ niemals ein Wort ohne gespeicherte Basis akzeptiert.
 
 | Regel | Typ | Beispiel |
 |---|---|---|
+| Aux/Modal-Verbtabelle | Suppletiv | ist → sein, kann → können, wäre → sein |
 | Endungsanalyse | Flexion | behandelt → behandel + n = behandeln |
 | ge-Partizip | Flexion | gezeichnet → zeichn + en = zeichnen |
 | Trennbare Vorsilbe | Flexion | angezeigt → an + zeig + en = anzeigen |
 | De-Umlaut | Flexion | Wände → wand (ä→a) |
+| zu-Infinitiv | Flexion | aufzulösen → auflösen |
 | -bar | Ableitung | einstellbar → einstell + en = einstellen |
 | -ung | Ableitung | Prüfung → prüf + en = prüfen |
 | -keit | Ableitung | Möglichkeit → mög + ig = möglich |
 | -heit | Ableitung | Freiheit → frei |
 | un- | Präfix | unlesbar → lesbar → lesen |
-| Komposita | Wortbildung | Schriftgröße → Schrift + Größe |
-| Bindestrich | Wortbildung | GeoWrite-Tutorial → GeoWrite + Tutorial |
+| Komposita (7 Fugenelemente) | Wortbildung | Arbeitsplatz → Arbeit + s + Platz |
+| Komposita (direkt) | Wortbildung | Schriftgröße → Schrift + Größe |
+| Bindestrich-Komposita | Wortbildung | GeoWrite-Tutorial → GeoWrite + Tutorial |
 
 Die Regeln sind nach Sprachcode gegated: die deutschen Regeln laufen nur,
-wenn `SL_GERMAN` (6) aktiv ist. Komposita-Splitting und `un-` sind
-sprachneutral.
+wenn der OLX1-Dateiheader `DE` enthält. Komposita-Splitting und `un-` sind
+sprachneutral. Der Sprachcode wird aus dem OLX1-Dateiheader gelesen, nicht
+aus der GEOS.INI.
 
-### 2. Wörterbuch-Neuauswahl mit Morphologie-Ranking
+### 2. Auxiliar- und Modalverbtabelle
+
+Eine kompakte Tabelle mit 117 irregehulären Formen von `sein`, `haben`,
+`werden`, den sechs Modalverben (`können`, `dürfen`, `mögen`, `müssen`,
+`sollen`, `wollen`) und `wissen` wird vor den allgemeinen Morphologie-Regeln
+geprüft. Die Tabelle umfasst Indikativ, Konjunktiv und Partizip und kostet
+ca. 1.025 Bytes im Codesegment (nicht im Heap).
+
+### 3. Komposita-Fugenelemente
+
+Der Komposita-Splitter verwendet 7 Fugenelemente mit Kostenbewertung:
+
+| Fugenelement | Kosten | Beispiel |
+|---|---:|---|
+| (keines) | 0 | Kraft + Fahrzeug |
+| s | 1 | Arbeit + s + Platz |
+| es | 2 | Jahr + es + Zeit |
+| n | 2 | Straße + n + Bahn |
+| en | 3 | Sonne + n + Schein |
+| er | 3 | Kind + er + Wagen |
+| e | 4 | Hund + e + Leine |
+
+Der Linker wird nur vom linken Bestandteil entfernt; der rechte Bestandteil
+wird exakt geprüft. Es werden höchstens 4 Kandidaten gesammelt und der
+niedrigste Kostenwert ausgewählt.
+
+### 4. Wörterbuch-Neuauswahl mit Morphologie-Ranking
 
 Die Prioritätsdatei wurde neu aufgebaut. Anstatt der Längensortierung werden
 nun Morphologie-Familien als Ranking-Signal verwendet. Eine Form wird als
 Kern (Core) eingestuft, wenn ihre Morphologie-Familie mindestens vier
 attestierte Verwandte hat (bei Nomini mindestens zwei). Die Kerne ersetzen
-die bisherige Längensortierung als Fallback.
+die bisherige Längensortierung als Fallback. Zusätzlich wurden 971
+häufige deutsche Wörter aus der heise-Korpusanalyse zur Prioritätsdatei
+hinzugefügt.
 
 | Parameter | Vorher | Nachher |
 |---|---|---|
 | Budget | 1.000.000 Bytes | 1.500.000 Bytes |
-| Datensätze | 130.396 | 162.329 |
+| Datensätze | 130.396 | 162.467 |
 | Wörterbuchgröße | 999.766 Bytes | 1.499.617 Bytes |
-| Korpus-Trefferquote | 6,0 % | 47,2 % |
+| Korpus-Trefferquote (Typen) | 6,0 % | 49,6 % |
+| Korpus-Trefferquote (Token) | — | 76,4 % |
 
-### 3. Behandlung von Sonderzeichen und Zeilenumbrüchen
+### 5. Behandlung von Sonderzeichen und Zeilenumbrüchen
 
 | Problem | Lösung |
 |---|---|
@@ -74,7 +107,7 @@ die bisherige Längensortierung als Fallback.
 | GEOS-Striche (0xD0–0xD5) | Werden übersprungen |
 | ASCII-Bindestrich (0x2D) | Wird als Trennzeichen für Komposita behalten |
 
-### 4. Zahlen und Symbole
+### 6. Zahlen und Symbole
 
 Die alte `numeric`-Prüfung (nur Ziffern 0–9) wurde durch `hasAlpha` ersetzt:
 Jeder Text ohne Buchstaben wird als *pre-processed* (kein Fehler) markiert.
@@ -82,7 +115,7 @@ Dadurch werden Zahlen wie `0,999` und Symbole wie `>`, `->` korrekt
 behandelt. Zusätzlich wurden ASCII-Symbole (`<`, `>`, `=`, `+`, `#`, `*`,
 `&`, `%`, `@`, `|`, `~`, `` ` ``) zur Randzeichensetzung hinzugefügt.
 
-### 5. GDI-Datei und GEOS-Konventionen
+### 7. GDI-Datei und GEOS-Konventionen
 
 Die GDI-Datei wurde an die GEOS-InfoBase-Konventionen angepasst:
 
@@ -90,18 +123,25 @@ Die GDI-Datei wurde an die GEOS-InfoBase-Konventionen angepasst:
 - DOS-Zeilenumbrüche (CR/LF)
 - Sprachcode 6 (Deutsch), Dialektcode 128 (scharfes ß)
 
+### 8. Sprachcode aus OLX1-Header
+
+Der Sprachcode für die Morphologie-Regeln wird aus dem OLX1-Dateiheader
+(Offset 36, ASCII-Sprach-ID wie "DE_DE") gelesen, nicht aus der GEOS.INI.
+Dadurch funktionieren die deutschen Regeln zuverlässig, auch wenn die
+GEOS.INI keinen `language`-Eintrag enthält.
+
 ## Messergebnisse
 
 ### Korpus-Test (heise-Magazin, 500 Artikel, 74.380 eindeutige Wörter)
 
-| Wörterbuchgröße | Datensätze | Trefferquote | Quelle |
-|---:|---:|---:|---|
-| 500 KB | 61.535 | 35,4 % | Nur Basis |
-| 750 KB | 90.060 | 42,2 % | |
-| 1.000 KB | 116.878 | 44,8 % | Ursprüngliche Größe |
-| **1.500 KB** | **162.329** | **47,2 %** | **Gewählter Sweet Spot** |
-| 2.000 KB | 212.818 | 47,9 % | Sinkender Nutzen |
-| 3.000 KB | 325.540 | 55,7 % | Hauptsächlich englische Lehnwörter |
+| Wörterbuchgröße | Datensätze | Typen-Trefferquote | Token-Trefferquote | Quelle |
+|---:|---:|---:|---:|---|
+| 500 KB | 61.535 | 35,4 % | — | Nur Basis |
+| 750 KB | 90.060 | 42,2 % | — | |
+| 1.000 KB | 116.878 | 44,8 % | — | Ursprüngliche Größe |
+| **1.500 KB** | **162.467** | **49,6 %** | **76,4 %** | **Gewählter Sweet Spot** |
+| 2.000 KB | 212.818 | 47,9 % | — | Sinkender Nutzen |
+| 3.000 KB | 325.540 | 55,7 % | — | Hauptsächlich englische Lehnwörter |
 
 Der Sweet Spot bei 1,5 MB liegt innerhalb eines typischen DOS-Plattenpuffers
 (SmartDrive, 2 MB Standard) und funktioniert daher auch auf alter Hardware.
@@ -128,28 +168,38 @@ Snowball-Stemmer-Prototyp liegt.
 | Verbleibend | ca. 2.500 Bytes |
 | OLContext (Reader-Cache) | ca. 3.330 Bytes |
 | OLMorphWorkspace | 260 Bytes |
+| Aux/Modal-Verbtabelle (Codesegment) | ca. 1.025 Bytes |
 | Wörterbuchdatei auf Disk | 1.499.617 Bytes |
 
 Die Wörterbuchdatei wird nicht in den Arbeitsspeicher geladen — der Reader
 cacht ein 1.024-Byte-Leaf on demand. Der Heap-Verbrauch bleibt konstant,
-unabhängig von der Wörterbuchgröße.
+unabhängig von der Wörterbuchgröße. Die Aux/Modal-Tabelle liegt als
+`static const` im Codesegment und belastet den Heap nicht.
 
 ## Dokumentierte Lücken
 
 - Starke Verben ohne adjektivische Partizipverwendung (z. B. *geschoben*
-  von *schieben*) — der Ablaut-Rückschluss (o→ie) ist mehrdeutig
+  von *schieben*) — der Ablaut-Rückschluss (o→ie) ist mehrdeutig. Die
+  häufigsten Fälle werden jedoch als Kerne im Wörterbuch gespeichert.
 - Nominalisierungen mit Umlaut-Plural ohne gespeicherte Singularform
   (z. B. *Wände* — *Wand* fehlt im Free German Dictionary)
 - Tier-2-Ableitungen (-isch, -ig, -los, -lich) sind nicht automatisiert
   (ihre Derivate werden gespeichert, wenn sie im Wörterbuch belegt sind)
+- Das Fugenelement `-ens` ist nicht implementiert (sehr selten, hohe
+  False-Split-Gefahr; für v1 ausgelassen)
 
 ## Technische Details
 
-Alle Änderungen sind in C89 (Kein Heap, keine libc, keine
+Alle Änderungen sind in C89 (kein Heap, keine libc, keine
 maschinenabhängigen Instruktionen) implementiert und laufen auf dem
 286-Ziel. Die Morphologie-Regeln verwenden das bestehende `olFind`-API
 des OLX1-Readers. Keine Änderung am OLX1-Dateiformat — volle Kompatibilität
 mit dem Upstream-Projekt bleibt erhalten.
+
+Compile-Time-Checks sicherstellen die GEOS-Speicherlimits:
+- `OpenSpellContext <= 8192` Bytes (Heap-Budget)
+- `OLContext <= 3328` Bytes (Reader-Cache)
+- `olMorphAuxForms <= 2048` Bytes (Aux/Modal-Tabelle)
 
 ## Software-Engineering
 
@@ -158,3 +208,4 @@ mit dem Upstream-Projekt bleibt erhalten.
 - Host-Validierung mit C89-Compiler vor jedem GEOS-Build
 - Korpus-Tests gegen 500 heise-Magazinartikel
 - Git-Tags für jede Arbeitsversion (dd_mm_yy-Konvention)
+- Fork unter https://github.com/hastho/OpenSpellGEOS
