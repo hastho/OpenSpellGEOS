@@ -1,0 +1,13 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Extracted Data snapshot (derivable from Data.zip, 75MB)
+Dictionaries/BuildTools/Data/
+
+# Example documents (personal test data)
+Examples/
+
+# OS files
+.DS_Store
+Thumbs.db
