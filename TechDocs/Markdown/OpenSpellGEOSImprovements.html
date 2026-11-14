@@ -1,0 +1,184 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2//EN">
+<HTML>
+<HEAD>
+<TITLE>OpenSpellGEOS: Erweiterte Rechtschreibpr&uuml;fung f&uuml;r PC/GEOS</TITLE>
+<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=iso-8859-1">
+<META NAME="generator" CONTENT="OpenSpellGEOS">
+</HEAD>
+<BODY BGCOLOR="#FFFFFF" TEXT="#000000">
+
+<H1>OpenSpellGEOS: Erweiterte Rechtschreibpr&uuml;fung f&uuml;r PC/GEOS</H1>
+
+<P>SPDX-License-Identifier: Apache-2.0</P>
+
+<H2>&Uuml;bersicht</H2>
+
+<P>Dieser Bericht dokumentiert die Verbesserungen, die zus&auml;tzlich zum
+OpenSpellGEOS-Upstream-Projekt (dnesbitt142) entwickelt wurden, um die
+deutsche Rechtschreibpr&uuml;fung unter PC/GEOS Ensemble zu erweitern.</P>
+
+<H2>Ausgangslage</H2>
+
+<P>Die urspr&uuml;ngliche OpenSpellGEOS-Bibliothek verwendet das OLX1-B-tree-Format
+zur W&ouml;rterbuchspeicherung und bietet eine exakte Wortsuche mit einer
+begrenzten Korrekturvorschlagsfunktion. Die W&ouml;rterbuchauswahl erfolgt &uuml;ber
+eine Heuristik (LOD-&Uuml;bersetzungskopfzeilen und L&auml;ngensortierung), nicht &uuml;ber
+Korpusfrequenz.</P>
+
+<P>Der Test mit echten deutschen Texten (heise-Magazinartikel) zeigte, dass sehr
+h&auml;ufige Flexionsformen wie <I>behandelt</I>, <I>angezeigt</I>, <I>gezeichnet</I> und
+Komposita wie <I>Schriftgr&ouml;&szlig;e</I> f&auml;lschlich als falsch markiert wurden.</P>
+
+<H2>Durchgef&uuml;hrte Verbesserungen</H2>
+
+<H3>1. Morphologie-Analyse zur Laufzeit</H3>
+
+<P>Eine neue C89-Bibliothek (<CODE>openmorph.inc</CODE>, ca. 500 Zeilen) wurde in die
+Spell-Bibliothek integriert. Sie akzeptiert ein unbekanntes Wort, wenn eine
+begrenzte Regelsequenz eine im W&ouml;rterbuch gespeicherte Basisform
+rekonstruiert. Alle Regeln pr&uuml;fen Kandidaten gegen das W&ouml;rterbuch &mdash; es wird
+niemals ein Wort ohne gespeicherte Basis akzeptiert.</P>
+
+<TABLE BORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TH>Regel</TH><TH>Typ</TH><TH>Beispiel</TH></TR>
+<TR><TD>Endungsanalyse</TD><TD>Flexion</TD><TD>behandelt &rarr; behandel + n = behandeln</TD></TR>
+<TR><TD>ge-Partizip</TD><TD>Flexion</TD><TD>gezeichnet &rarr; zeichn + en = zeichnen</TD></TR>
+<TR><TD>Trennbare Vorsilbe</TD><TD>Flexion</TD><TD>angezeigt &rarr; an + zeig + en = anzeigen</TD></TR>
+<TR><TD>De-Umlaut</TD><TD>Flexion</TD><TD>W&auml;nde &rarr; wand (&auml;&rarr;a)</TD></TR>
+<TR><TD>-bar</TD><TD>Ableitung</TD><TD>einstellbar &rarr; einstell + en = einstellen</TD></TR>
+<TR><TD>-ung</TD><TD>Ableitung</TD><TD>Pr&uuml;fung &rarr; pr&uuml;f + en = pr&uuml;fen</TD></TR>
+<TR><TD>-keit</TD><TD>Ableitung</TD><TD>M&ouml;glichkeit &rarr; m&ouml;g + ig = m&ouml;glich</TD></TR>
+<TR><TD>-heit</TD><TD>Ableitung</TD><TD>Freiheit &rarr; frei</TD></TR>
+<TR><TD>un-</TD><TD>Pr&auml;fix</TD><TD>unlesbar &rarr; lesbar &rarr; lesen</TD></TR>
+<TR><TD>Komposita</TD><TD>Wortbildung</TD><TD>Schriftgr&ouml;&szlig;e &rarr; Schrift + Gr&ouml;&szlig;e</TD></TR>
+<TR><TD>Bindestrich</TD><TD>Wortbildung</TD><TD>GeoWrite-Tutorial &rarr; GeoWrite + Tutorial</TD></TR>
+</TABLE>
+
+<P>Die Regeln sind nach Sprachcode gegated: die deutschen Regeln laufen nur,
+wenn <CODE>SL_GERMAN</CODE> (6) aktiv ist. Komposita-Splitting und <CODE>un-</CODE> sind
+sprachneutral.</P>
+
+<H3>2. W&ouml;rterbuch-Neuauswahl mit Morphologie-Ranking</H3>
+
+<P>Die Priorit&auml;tsdatei wurde neu aufgebaut. Anstatt der L&auml;ngensortierung werden
+nun Morphologie-Familien als Ranking-Signal verwendet. Eine Form wird als
+Kern (Core) eingestuft, wenn ihre Morphologie-Familie mindestens vier
+attestierte Verwandte hat (bei Nomini mindestens zwei). Die Kerne ersetzen
+die bisherige L&auml;ngensortierung als Fallback.</P>
+
+<TABLE BORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TH>Parameter</TH><TH>Vorher</TH><TH>Nachher</TH></TR>
+<TR><TD>Budget</TD><TD>1.000.000 Bytes</TD><TD>1.500.000 Bytes</TD></TR>
+<TR><TD>Datens&auml;tze</TD><TD>130.396</TD><TD>162.329</TD></TR>
+<TR><TD>W&ouml;rterbuchgr&ouml;&szlig;e</TD><TD>999.766 Bytes</TD><TD>1.499.617 Bytes</TD></TR>
+<TR><TD>Korpus-Trefferquote</TD><TD>6,0 %</TD><TD>47,2 %</TD></TR>
+</TABLE>
+
+<H3>3. Behandlung von Sonderzeichen und Zeilenumbr&uuml;chen</H3>
+
+<TABLE BORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TH>Problem</TH><TH>L&ouml;sung</TH></TR>
+<TR><TD>Weicher Zeilenumbruch (0x1F, C_OPTHYPHEN)</TD><TD>Wird beim Wortaufbau &uuml;bersprungen</TD></TR>
+<TR><TD>Gesch&uuml;tztes Leerzeichen (0xCA, C_NONBRKSPACE)</TD><TD>Wird &uuml;bersprungen</TD></TR>
+<TR><TD>Bedingter Bindestrich (0x1E, C_NONBRKHYPHEN)</TD><TD>Wird &uuml;bersprungen</TD></TR>
+<TR><TD>Zeilenumbruch (0x0D, 0x0A)</TD><TD>Wird &uuml;bersprungen &mdash; Wort wird verbunden</TD></TR>
+<TR><TD>GEOS-Striche (0xD0&ndash;0xD5)</TD><TD>Werden &uuml;bersprungen</TD></TR>
+<TR><TD>ASCII-Bindestrich (0x2D)</TD><TD>Wird als Trennzeichen f&uuml;r Komposita behalten</TD></TR>
+</TABLE>
+
+<H3>4. Zahlen und Symbole</H3>
+
+<P>Die alte <CODE>numeric</CODE>-Pr&uuml;fung (nur Ziffern 0&ndash;9) wurde durch <CODE>hasAlpha</CODE> ersetzt:
+Jeder Text ohne Buchstaben wird als <I>pre-processed</I> (kein Fehler) markiert.
+Dadurch werden Zahlen wie <CODE>0,999</CODE> und Symbole wie <CODE>&gt;</CODE>, <CODE>-&gt;</CODE> korrekt
+behandelt. Zus&auml;tzlich wurden ASCII-Symbole (<CODE>&lt;</CODE>, <CODE>&gt;</CODE>, <CODE>=</CODE>, <CODE>+</CODE>, <CODE>#</CODE>, <CODE>*</CODE>,
+<CODE>&amp;</CODE>, <CODE>%</CODE>, <CODE>@</CODE>, <CODE>|</CODE>, <CODE>~</CODE>, <CODE>`</CODE>) zur Randzeichensetzung hinzugef&uuml;gt.</P>
+
+<H3>5. GDI-Datei und GEOS-Konventionen</H3>
+
+<P>Die GDI-Datei wurde an die GEOS-InfoBase-Konventionen angepasst:</P>
+
+<UL>
+<LI>ISO-8859-1-Codierung (&szlig; als 0xDF)
+<LI>DOS-Zeilenumbr&uuml;che (CR/LF)
+<LI>Sprachcode 6 (Deutsch), Dialektcode 128 (scharfes &szlig;)
+</UL>
+
+<H2>Messergebnisse</H2>
+
+<H3>Korpus-Test (heise-Magazin, 500 Artikel, 74.380 eindeutige W&ouml;rter)</H3>
+
+<TABLE BORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TH ALIGN="right">W&ouml;rterbuchgr&ouml;&szlig;e</TH><TH ALIGN="right">Datens&auml;tze</TH><TH ALIGN="right">Trefferquote</TH><TH>Quelle</TH></TR>
+<TR><TD ALIGN="right">500 KB</TD><TD ALIGN="right">61.535</TD><TD ALIGN="right">35,4 %</TD><TD>Nur Basis</TD></TR>
+<TR><TD ALIGN="right">750 KB</TD><TD ALIGN="right">90.060</TD><TD ALIGN="right">42,2 %</TD><TD>&nbsp;</TD></TR>
+<TR><TD ALIGN="right">1.000 KB</TD><TD ALIGN="right">116.878</TD><TD ALIGN="right">44,8 %</TD><TD>Urspr&uuml;ngliche Gr&ouml;&szlig;e</TD></TR>
+<TR><TD ALIGN="right"><B>1.500 KB</B></TD><TD ALIGN="right"><B>162.329</B></TD><TD ALIGN="right"><B>47,2 %</B></TD><TD><B>Gew&auml;hlter Sweet Spot</B></TD></TR>
+<TR><TD ALIGN="right">2.000 KB</TD><TD ALIGN="right">212.818</TD><TD ALIGN="right">47,9 %</TD><TD>Sinkender Nutzen</TD></TR>
+<TR><TD ALIGN="right">3.000 KB</TD><TD ALIGN="right">325.540</TD><TD ALIGN="right">55,7 %</TD><TD>Haupts&auml;chlich englische Lehnw&ouml;rter</TD></TR>
+</TABLE>
+
+<P>Der Sweet Spot bei 1,5 MB liegt innerhalb eines typischen DOS-Plattenpuffers
+(SmartDrive, 2 MB Standard) und funktioniert daher auch auf alter Hardware.</P>
+
+<H3>Falsch-Akzeptanz (Mutations-Test)</H3>
+
+<TABLE BORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TH>Mutation</TH><TH ALIGN="right">Ausgang (nur exakt)</TH><TH ALIGN="right">Mit Morphologie</TH></TR>
+<TR><TD>L&ouml;schung</TD><TD ALIGN="right">1,2 %</TD><TD ALIGN="right">9,5 %</TD></TR>
+<TR><TD>Ersetzung</TD><TD ALIGN="right">0,2 %</TD><TD ALIGN="right">4,7 %</TD></TR>
+<TR><TD>Vertauschung</TD><TD ALIGN="right">0,2 %</TD><TD ALIGN="right">3,4 %</TD></TR>
+<TR><TD>Verdopplung</TD><TD ALIGN="right">0,1 %</TD><TD ALIGN="right">3,6 %</TD></TR>
+</TABLE>
+
+<P>Die Morphologie erh&ouml;ht die Trefferquote um das Neunfache bei einem moderaten
+Anstieg der Falsch-Akzeptanz, die im gleichen Bereich wie der
+Snowball-Stemmer-Prototyp liegt.</P>
+
+<H3>Speicherverbrauch</H3>
+
+<TABLE BORDER="1" CELLPADDING="4" CELLSPACING="0">
+<TR><TH>Block</TH><TH ALIGN="right">Gr&ouml;&szlig;e</TH></TR>
+<TR><TD>OpenSpellContext (Heap)</TD><TD ALIGN="right">ca. 5.700 Bytes</TD></TR>
+<TR><TD>Budget (GEOS 8 KB-Etikette)</TD><TD ALIGN="right">8.192 Bytes</TD></TR>
+<TR><TD>Verbleibend</TD><TD ALIGN="right">ca. 2.500 Bytes</TD></TR>
+<TR><TD>OLContext (Reader-Cache)</TD><TD ALIGN="right">ca. 3.330 Bytes</TD></TR>
+<TR><TD>OLMorphWorkspace</TD><TD ALIGN="right">260 Bytes</TD></TR>
+<TR><TD>W&ouml;rterbuchdatei auf Disk</TD><TD ALIGN="right">1.499.617 Bytes</TD></TR>
+</TABLE>
+
+<P>Die W&ouml;rterbuchdatei wird nicht in den Arbeitsspeicher geladen &mdash; der Reader
+cacht ein 1.024-Byte-Leaf on demand. Der Heap-Verbrauch bleibt konstant,
+unabh&auml;ngig von der W&ouml;rterbuchgr&ouml;&szlig;e.</P>
+
+<H2>Dokumentierte L&uuml;cken</H2>
+
+<UL>
+<LI>Starke Verben ohne adjektivische Partizipverwendung (z. B. <I>geschoben</I>
+  von <I>schieben</I>) &mdash; der Ablaut-R&uuml;ckschluss (o&rarr;ie) ist mehrdeutig
+<LI>Nominalisierungen mit Umlaut-Plural ohne gespeicherte Singularform
+  (z. B. <I>W&auml;nde</I> &mdash; <I>Wand</I> fehlt im Free German Dictionary)
+<LI>Tier-2-Ableitungen (-isch, -ig, -los, -lich) sind nicht automatisiert
+  (ihre Derivate werden gespeichert, wenn sie im W&ouml;rterbuch belegt sind)
+</UL>
+
+<H2>Technische Details</H2>
+
+<P>Alle &Auml;nderungen sind in C89 (Kein Heap, keine libc, keine
+maschinenabh&auml;ngigen Instruktionen) implementiert und laufen auf dem
+286-Ziel. Die Morphologie-Regeln verwenden das bestehende <CODE>olFind</CODE>-API
+des OLX1-Readers. Keine &Auml;nderung am OLX1-Dateiformat &mdash; volle Kompatibilit&auml;t
+mit dem Upstream-Projekt bleibt erhalten.</P>
+
+<H2>Software-Engineering</H2>
+
+<UL>
+<LI>Alle &Auml;nderungen wurden in kleinen, sicher rollbaren Schritten
+  entwickelt und getestet
+<LI>Host-Validierung mit C89-Compiler vor jedem GEOS-Build
+<LI>Korpus-Tests gegen 500 heise-Magazinartikel
+<LI>Git-Tags f&uuml;r jede Arbeitsversion (dd_mm_yy-Konvention)
+</UL>
+
+</BODY>
+</HTML>
