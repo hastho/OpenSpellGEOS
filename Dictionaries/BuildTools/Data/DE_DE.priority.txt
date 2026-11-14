@@ -73187,3 +73187,4 @@ bedarf
 gestunken
 geholfen
 hangen
+Kraft

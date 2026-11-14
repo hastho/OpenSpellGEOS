@@ -404,22 +404,41 @@ static int OL_CALL olMorphScanInner(OLContext *lexP, const unsigned char *wordP,
     return 0;
 }
 
-/* Validate one compound part with case probes and one linking-element
- * strip on the left part. Returns one on a hit, zero on absence. */
-static int OL_CALL olMorphPart(OLContext *lexP, const unsigned char *partP,
-                               unsigned short length, OLMorphWorkspace *workP,
-                               unsigned short allowLink)
+/* Compound linking elements (Fugenelemente) for German. The linker
+ * belongs to the left constituent; the right head is validated exactly.
+ * No -ens in v1 (rare, high false-split risk). Costs encode plausibility. */
+static const struct {
+    char text[3];
+    unsigned char length;
+    unsigned char cost;
+} olMorphLinkers[] = {
+    { "",   0, 0 },  /* LINK_NONE */
+    { "s",  1, 1 },  /* LINK_S   */
+    { "es", 2, 2 },  /* LINK_ES  */
+    { "n",  1, 2 },  /* LINK_N   */
+    { "en", 2, 3 },  /* LINK_EN  */
+    { "er", 2, 3 },  /* LINK_ER  */
+    { "e",  1, 4 }   /* LINK_E   */
+};
+#define OL_MORPH_LINKER_COUNT \
+    ((unsigned short)(sizeof(olMorphLinkers) / sizeof(olMorphLinkers[0])))
+#define OL_MORPH_MAX_CANDIDATES 4
+#define OL_MORPH_SPLIT_PENALTY  8
+
+/* Validate one compound part with case probes and one noun-ending strip.
+ * Used for the right head (no linker strip). Returns one on a hit. */
+static int OL_CALL olMorphPartRight(OLContext *lexP,
+                                    const unsigned char *partP,
+                                    unsigned short length,
+                                    OLMorphWorkspace *workP)
 {
     unsigned short stemLength;
     int probe;
 
-    /* Direct case probe. */
     probe = olMorphProbe(lexP, partP, length, workP->probe);
     if (probe != 0) {
         return probe;
     }
-    /* Try one noun ending strip for compound parts: plural -e, dative -n
-     * or genitive -s. For example, "attribute" strips to "attribut". */
     if (length > OL_MORPH_MIN_PART + 1 &&
         (partP[length - 1] == 'e' || partP[length - 1] == 'n' ||
          partP[length - 1] == 's')) {
@@ -431,59 +450,106 @@ static int OL_CALL olMorphPart(OLContext *lexP, const unsigned char *partP,
             return probe;
         }
     }
-    /* Try one linking-element strip on the left part. */
-    if (!allowLink || length < 5) {
-        return 0;
-    }
-    if (partP[length - 1] == 's' || partP[length - 1] == 'n') {
-        stemLength = length - 1;
-    } else if (partP[length - 2] == 'e' &&
-               (partP[length - 1] == 's' || partP[length - 1] == 'n')) {
-        stemLength = length - 2;
-    } else {
-        return 0;
-    }
-    if (stemLength < OL_MORPH_MIN_PART) {
-        return 0;
-    }
-    olMorphCopy(partP, workP->candidate, stemLength);
-    return olMorphProbe(lexP, workP->candidate, stemLength, workP->probe);
+    return 0;
 }
 
-/* Accept an attested-compound spelling when both parts are stored bases.
- * The whole unsigned short itself is not required to be stored. Returns one on a
- * hit, zero on absence, -1 on error. */
-static int OL_CALL olMorphCompound(OLContext *lexP, const unsigned char *wordP,
-                                   unsigned short length, OLMorphWorkspace *workP)
+/* Check whether the left surface (stem + linker) matches the input and
+ * the stripped left stem validates in the dictionary. Returns one if the
+ * left stem is found, filling rightStart with the right-part offset. */
+static int OL_CALL olMorphTryLeft(OLContext *lexP,
+                                  const unsigned char *wordP,
+                                  unsigned short length,
+                                  unsigned short stemLen,
+                                  unsigned short linkerIndex,
+                                  OLMorphWorkspace *workP,
+                                  unsigned short *rightStart)
+{
+    const char *linker = olMorphLinkers[linkerIndex].text;
+    unsigned short linkerLen = olMorphLinkers[linkerIndex].length;
+    unsigned short surfaceLen = stemLen + linkerLen;
+
+    if (surfaceLen > length || stemLen < OL_MORPH_MIN_PART) {
+        return 0;
+    }
+    /* Verify the linker text matches the input at the boundary. */
+    if (linkerLen > 0) {
+        unsigned short i;
+        for (i = 0; i < linkerLen; ++i) {
+            if (wordP[stemLen + i] != (unsigned char)linker[i]) {
+                return 0;
+            }
+        }
+    }
+    /* Probe the stripped left stem (title-case for nouns). */
+    olMorphCopy(wordP, workP->candidate, stemLen);
+    if (olMorphProbe(lexP, workP->candidate, stemLen,
+                     workP->probe) != 1) {
+        return 0;
+    }
+    *rightStart = surfaceLen;
+    return 1;
+}
+
+/* Accept an attested-compound spelling with bounded best-match scoring.
+ * Tries the empty linker first, then linkers in cost order. Collects at
+ * most OL_MORPH_MAX_CANDIDATES valid candidates and accepts the lowest
+ * cost. The right head is validated exactly (with noun-ending strip).
+ * No linker is stripped from the right part. */
+static int OL_CALL olMorphCompound(OLContext *lexP,
+                                    const unsigned char *wordP,
+                                    unsigned short length,
+                                    OLMorphWorkspace *workP)
 {
     unsigned short split;
-    int left;
+    unsigned short linkerIndex;
+    unsigned short rightStart;
+    unsigned short rightLen;
+    unsigned short bestCost;
+    unsigned char candidateCount;
     int right;
 
     if (length < 2 * OL_MORPH_MIN_PART) {
         return 0;
     }
-    for (split = OL_MORPH_MIN_PART; split <= length - OL_MORPH_MIN_PART;
+    bestCost = 255;
+    candidateCount = 0;
+
+    for (split = OL_MORPH_MIN_PART;
+         split <= length - OL_MORPH_MIN_PART && candidateCount < OL_MORPH_MAX_CANDIDATES;
          ++split) {
-        olMorphCopy(wordP, workP->candidate, split);
-        left = olMorphPart(lexP, workP->candidate, split, workP, 1);
-        if (left != 1) {
-            if (left < 0) {
-                return left;
+        for (linkerIndex = 0;
+             linkerIndex < OL_MORPH_LINKER_COUNT &&
+             candidateCount < OL_MORPH_MAX_CANDIDATES;
+             ++linkerIndex) {
+            if (!olMorphTryLeft(lexP, wordP, length, split,
+                                linkerIndex, workP, &rightStart)) {
+                continue;
             }
-            continue;
-        }
-        olMorphCopy(wordP + split, workP->part, length - split);
-        right = olMorphPart(lexP, workP->part, length - split, workP, 0);
-        if (right == 1) {
-            return 1;
-        }
-        if (right < 0) {
-            return right;
+            rightLen = length - rightStart;
+            if (rightLen < OL_MORPH_MIN_PART) {
+                continue;
+            }
+            right = olMorphPartRight(lexP, wordP + rightStart, rightLen,
+                                     workP);
+            if (right != 1) {
+                if (right < 0) {
+                    return right;
+                }
+                continue;
+            }
+            {
+                unsigned char cost = olMorphLinkers[linkerIndex].cost +
+                                    OL_MORPH_SPLIT_PENALTY;
+                if (cost < bestCost) {
+                    bestCost = cost;
+                }
+                ++candidateCount;
+            }
         }
     }
-    return 0;
+    return candidateCount > 0 ? 1 : 0;
 }
+
 
 /* Public entry. wordP is the folded lowercase spelling. language is the
  * GEOS StandardLanguage code from the active dictionary. German-specific
