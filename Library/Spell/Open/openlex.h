@@ -57,6 +57,7 @@ typedef struct {
     unsigned char kind;
     unsigned char valid;
     unsigned char lastKeyLength;
+    unsigned char language;
     unsigned char block[OL_BLOCK_SIZE];
     unsigned char index[OL_INDEX_SIZE];
     unsigned char key[OL_KEY_MAX + 1];

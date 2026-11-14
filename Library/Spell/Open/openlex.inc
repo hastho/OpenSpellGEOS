@@ -359,6 +359,23 @@ int OL_CALL olOpen(OLContext *contextP, OLRead read, void *userP,
         }
     }
     contextP->kind = expectedKind;
+    /* Extract the GEOS StandardLanguage code from the OLX1 header's
+     * 8-byte language field (offset 36). The field stores an ASCII
+     * language ID like "DE_DE" or "EN_GB"; the first two bytes identify
+     * the language family. This is more reliable than the GEOS.INI
+     * [text] language setting, which may be absent. */
+    contextP->language = 0;
+    if (contextP->block[36] == 'D' && contextP->block[37] == 'E') {
+        contextP->language = 6;   /* SL_GERMAN */
+    } else if (contextP->block[36] == 'E' && contextP->block[37] == 'N') {
+        contextP->language = 16;  /* SL_ENGLISH */
+    } else if (contextP->block[36] == 'F' && contextP->block[37] == 'R') {
+        contextP->language = 5;   /* SL_FRENCH */
+    } else if (contextP->block[36] == 'S' && contextP->block[37] == 'V') {
+        contextP->language = 7;   /* SL_SWEDISH */
+    } else if (contextP->block[36] == 'L' && contextP->block[37] == 'B') {
+        contextP->language = 0;   /* Luxembourgish: no SL code */
+    }
     entries = olLong(contextP->block + 12);
     contextP->indexCount = olLong(contextP->block + 16);
     contextP->dataOffset = olLong(contextP->block + 24);

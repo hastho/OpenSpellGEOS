@@ -728,7 +728,7 @@ word _pascal _export ICGEOSpl(const unsigned char *sourceP, MemHandle bufferH)
                         lookup = olMorphCheck(&contextP->dictionary.lex,
                                               contextP->folded, length,
                                               &contextP->morph,
-                                              bufferP->ICB_language);
+                                              contextP->dictionary.lex.language);
                     }
                     if (!lookup) {
                         /* Accept English-style hyphenated compounds when
@@ -769,7 +769,7 @@ word _pascal _export ICGEOSpl(const unsigned char *sourceP, MemHandle bufferH)
                                     &contextP->dictionary.lex,
                                     contextP->folded + segStart,
                                     segLen, &contextP->morph,
-                                    bufferP->ICB_language);
+                                    contextP->dictionary.lex.language);
                                 if (segFound != 1) {
                                     /* Copy segment into a null-terminated
                                      * buffer for the user-dict check. */
