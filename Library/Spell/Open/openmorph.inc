@@ -401,6 +401,36 @@ static int OL_CALL olMorphScanInner(OLContext *lexP, const unsigned char *wordP,
             return probe;
         }
     }
+    /* German zu-infinitive: "aufzuloesen" -> find and remove "zu" ->
+     * "aufloesen". The zu appears between a separable prefix and the
+     * verb stem. Try removing one "zu" at each position >= 2 and probe
+     * the result. Only for German, at depth 0. */
+    if (depth == 0 && language == OL_MORPH_LANG_GERMAN && length >= 6) {
+        unsigned short zuPos;
+        unsigned short i;
+        for (zuPos = 2; zuPos < length - 2; ++zuPos) {
+            if (wordP[zuPos] != 'z' || wordP[zuPos + 1] != 'u') {
+                continue;
+            }
+            for (i = 0; i < zuPos; ++i) {
+                workP->candidate[i] = wordP[i];
+            }
+            for (i = 0; i < length - zuPos - 2; ++i) {
+                workP->candidate[zuPos + i] = wordP[zuPos + 2 + i];
+            }
+            probe = olMorphProbe(lexP, workP->candidate,
+                                 length - 2, workP->probe);
+            if (probe == 1) {
+                return 1;
+            }
+            /* Also try the inner scan on the zu-stripped form. */
+            probe = olMorphScanInner(lexP, workP->candidate,
+                                     length - 2, workP, 1, language);
+            if (probe != 0) {
+                return probe;
+            }
+        }
+    }
     return 0;
 }
 
