@@ -725,10 +725,15 @@ word _pascal _export ICGEOSpl(const unsigned char *sourceP, MemHandle bufferH)
                         }
                     }
                     if (!lookup) {
+                        unsigned char morphLang;
+                        morphLang = bufferP->ICB_language;
+                        if (morphLang == 0) {
+                            morphLang = contextP->dictionary.lex.language;
+                        }
                         lookup = olMorphCheck(&contextP->dictionary.lex,
                                               contextP->folded, length,
                                               &contextP->morph,
-                                              contextP->dictionary.lex.language);
+                                              morphLang);
                     }
                     if (!lookup) {
                         /* Accept English-style hyphenated compounds when
@@ -765,11 +770,18 @@ word _pascal _export ICGEOSpl(const unsigned char *sourceP, MemHandle bufferH)
                                  segFlag == OL_EXACT_CASE)) {
                                 /* Found in main dictionary */
                             } else {
-                                segFound = olMorphCheck(
-                                    &contextP->dictionary.lex,
-                                    contextP->folded + segStart,
-                                    segLen, &contextP->morph,
-                                    contextP->dictionary.lex.language);
+                                {
+                                    unsigned char segLang;
+                                    segLang = bufferP->ICB_language;
+                                    if (segLang == 0) {
+                                        segLang = contextP->dictionary.lex.language;
+                                    }
+                                    segFound = olMorphCheck(
+                                        &contextP->dictionary.lex,
+                                        contextP->folded + segStart,
+                                        segLen, &contextP->morph,
+                                        segLang);
+                                }
                                 if (segFound != 1) {
                                     /* Copy segment into a null-terminated
                                      * buffer for the user-dict check. */
