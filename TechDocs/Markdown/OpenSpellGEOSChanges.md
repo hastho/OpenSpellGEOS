@@ -83,6 +83,19 @@ on 4,000 heise articles (5.6M tokens, 331K types). Key findings:
 - All six `.GDI` files updated to `"OpenSpellGEOS 1.1 (Build 21/11/26)"`.
 - `spell.gp` `usernotes` fixed (typo "buld" → "build") and versioned.
 
+### v1.1.1 — gate compound linker table to German only
+
+The compound splitter's Fugenelemente linker table (`s`, `es`, `n`, `en`,
+`er`, `e`) is German-specific. Other languages don't use linking elements in
+compounds, and the linkers cause false splits in English (e.g. a word
+splitting as `stem+s+head` where `s` is a plural marker, not a linker).
+
+`olMorphCompound` now takes a `language` parameter and uses only `LINK_NONE`
+(index 0) for non-German languages. German keeps the full linker table. The
+`un-` prefix and `LINK_NONE` compound splitting remain language-agnostic.
+
+Validated on real hardware (FreeDOS 1.3) and on BaseBox / stock DOSBox 0.74.
+
 ## Personal dictionary errors and project layout, 2026-10-01
 
 The technical guides now follow the GitHub repository layout. Python builders
