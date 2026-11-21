@@ -67,19 +67,11 @@ the input list are not automatically accepted.
 
 ## Compact release policy
 
-Every distributed .DCT, .THS and .HYP file must be at most 500000 bytes,
-inclusive, except the German profile whose `DE_DE.DCT` and `DE_DE.HYP` use a
-1500000-byte per-file budget. The German exception is justified by the
-morphology benchmark: German inflection is handled at runtime by the bounded
-C89 rules in `Library/Spell/Open/openmorph.inc`, and a larger surface-ranked
-base dictionary lets the cheap exact path fire more often before the rules
-rescue the long tail (85.9% token coverage at 1.5 MB versus 73.5% at 500 KB
-with morphology, versus 66.3% at 500 KB data-only). See
-`TechDocs/Markdown/OpenSpellGEOSMorphologyBenchmark.md`. This is 500,000
-decimal bytes per file, not 500 KiB, and includes the complete header, index,
-leaves, padding and external values. The ceiling applies separately to each of
-the eighteen linguistic files. GDI records, notices and build reports
-accompany them; they are not dictionary payloads.
+Every distributed .DCT, .THS and .HYP file must be at most 1000000 bytes,
+inclusive. This is 1,000,000 decimal bytes per file, not 1 MiB, and includes
+the complete header, index, leaves, padding and external values. The ceiling
+applies separately to each of the eighteen linguistic files. GDI records,
+notices and build reports accompany them; they are not dictionary payloads.
 
 The compact release selects vocabulary and thesaurus records before writing
 the existing OLX1 format. The corrective runtime uses those same files without
@@ -100,10 +92,9 @@ an omitted thesaurus headword has no result, and a word absent from the HYP
 file has no automatic break. Smaller files do not remove the need for native
 language review or correct gaps in the underlying sources.
 
-The compact release audit verified all 1,298,307 retained records and all
-eighteen complete file sizes. They total 13,947,836 decimal bytes, with each
-file at or below its ceiling (the generic 500000-byte ceiling, plus the
-documented 1500000-byte German exception for `DE_DE.DCT` and `DE_DE.HYP`). Per-file counts, omissions and exact sizes are
+The compact release audit verified all 1,175,861 retained records and all
+eighteen complete file sizes. They total 12,948,134 decimal bytes, with each
+file at or below the 1000000-byte ceiling. Per-file counts, omissions and exact sizes are
 in OpenSpellGEOSData.md and BUILD.json.
 
 ## Design and memory
@@ -198,14 +189,11 @@ matching library builds. Do not install a host object file as a .geo file.
 Unpack the selected language ZIP from Dictionaries into a temporary location.
 Each archive contains a language folder, such as English_UK or Luxembourgish.
 Copy that folder's .DCT, .THS, .HYP and .GDI files directly into
-Ensemble/USERDATA/DICTS. Multiple profiles may coexist. Each non-German
-profile's three compact linguistic files together use at most 1500000 decimal
-bytes (three 500000-byte files); the German profile uses up to 4500000 bytes
-(its 1.5 MB DCT, 1.5 MB HYP and the small German thesaurus), because German
-benefits from a larger base dictionary plus runtime morphology. Install only
-the profiles needed. Retain NOTICES.TXT and LICENSES with copies. The build
-helper includes those notices automatically. The lookup path uses
-SP_USER_DATA (the same standard path as SP_PUBLIC_DATA).
+Ensemble/USERDATA/DICTS. Multiple profiles may coexist. Each profile's three
+compact linguistic files together use at most 3000000 decimal bytes (three
+1000000-byte files). Install only the profiles needed. Retain NOTICES.TXT and
+LICENSES with copies. The build helper includes those notices automatically.
+The lookup path uses SP_USER_DATA (the same standard path as SP_PUBLIC_DATA).
 
 Select a supplied dictionary through Preferences. The .GDI parser writes the
 existing [text] language, dialect, languageName, and dictionary keys and asks

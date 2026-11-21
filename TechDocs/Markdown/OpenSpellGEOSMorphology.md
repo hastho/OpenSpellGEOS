@@ -210,29 +210,31 @@ forms so the cheap exact path fires often.
 
 | File | Records | Bytes |
 | --- | ---: | ---: |
-| DE_DE.DCT | 194,009 | 1,499,617 |
-| DE_DE.HYP | 173,841 | 1,499,617 |
+| DE_DE.DCT | 130,300 | 999,766 |
+| DE_DE.HYP | 115,104 | 999,766 |
 
-The DCT and HYP are at the 1,500,000-byte budget. The THS and GDI files
+The DCT and HYP are at the 1,000,000-byte budget. The THS and GDI files
 are unchanged. The ranking uses only the pinned Free German Dictionary
 snapshot. No external corpus or copyleft-licensed data is used.
 
 ### Rebuild tool
 
 The script `Dictionaries/BuildTools/build_german_surface.py` automates the
-surface-ranked rebuild at the German 1,500,000-byte budget. It requires the
-extracted Data snapshot (`Dictionaries/BuildTools/Data/`).
+surface-ranked rebuild at the German 1,000,000-byte per-file budget. It
+requires the extracted Data snapshot (`Dictionaries/BuildTools/Data/`).
 
 ```text
-python3 Dictionaries/BuildTools/build_german_surface.py --budget 1500000
+python3 Dictionaries/BuildTools/build_german_surface.py --budget 1000000
 ```
 
-The `--budget` option sets the per-file byte ceiling (default 1,500,000).
-The script selects entries with the surface priority, writes the DCT,
-regenerates the HYP from the selected vocabulary, and removes its temporary
-files. The deprecated `rebuild_german.py` (morphology-aware core ranking)
-is retained for reference but is not the default and not recommended; see
-`TechDocs/Markdown/OpenSpellGEOSData.md` and
+The `--budget` option sets the per-file byte ceiling (default 1,000,000).
+The benchmark measured 84.9% token coverage at 1 MB and 85.9% at 1.5 MB;
+the 1 MB default keeps the German profile at the same ceiling as the other
+profiles. The script selects entries with the surface priority, writes the
+DCT, regenerates the HYP from the selected vocabulary, and removes its
+temporary files. The deprecated `rebuild_german.py` (morphology-aware core
+ranking) is retained for reference but is not the default and not
+recommended; see `TechDocs/Markdown/OpenSpellGEOSData.md` and
 `TechDocs/Markdown/OpenSpellGEOSMorphologyBenchmark.md` for the evidence.
 
 ### Corpus coverage tool

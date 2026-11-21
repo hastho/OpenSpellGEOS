@@ -46,7 +46,7 @@
     "lexicon-normalization-report.json": "037b3af3b94a0cc59e931bbe0147cc248f00ba348543d6bd9382c7427b63b18a",
     "lod-terms-normalization.json": "15cd15a771f679a139c3b53a1ab11d32a65a38b6d86353219fa78152a6d14ee3"
   },
-  "max_file_bytes": 1500000,
+  "max_file_bytes": 1000000,
   "notices": {
     "LICENSES/APACHE2.TXT": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
     "LICENSES/CC0.TXT": "a2010f343487d3f7618affe54f789f5487602331c0a8d03f49e9a7c547cf0499",
@@ -296,24 +296,24 @@
       },
       "files": [
         {
-          "blocks": 1377,
-          "bytes": 1499617,
-          "entries": 194009,
+          "blocks": 918,
+          "bytes": 999766,
+          "entries": 130300,
           "file": "DE_DE.DCT",
           "kind": 1,
           "language": "DE_DE",
           "selection": {
             "candidate_records": 2152641,
-            "estimated_bytes": 1499617,
-            "max_bytes": 1500000,
-            "omitted_records": 1958632,
+            "estimated_bytes": 999766,
+            "max_bytes": 1000000,
+            "omitted_records": 2022341,
             "optimality": "largest fitting tested prefix; not a global maximum claim",
             "policy": "priority-prefix-bounded-size-search-v1",
             "priority_hit_records": 74102,
-            "ranking_considered": 194009,
-            "selected_records": 194009
+            "ranking_considered": 130300,
+            "selected_records": 130300
           },
-          "sha256": "21d676abef88f398227f73819ada9d047ef27c581dcfa6a178b8fe6242095c8d",
+          "sha256": "500743418b29dedfe941f3573f3e2d7e749830bce4028809a8de3b7a226ada70",
           "vocabulary": {
             "candidate_forms": 2152641,
             "primary_file": "DE.words.txt",
@@ -362,30 +362,30 @@
           "sha256": "8c166a9e4ee8378f52267b66b366e053db36f0de84b75ea5e71d3d99aa96ef03"
         },
         {
-          "blocks": 1377,
-          "bytes": 1499617,
-          "entries": 173841,
+          "blocks": 918,
+          "bytes": 999766,
+          "entries": 115104,
           "file": "DE_DE.HYP",
           "kind": 3,
           "language": "DE_DE",
           "selection": {
-            "candidate_records": 184629,
-            "estimated_bytes": 1499617,
-            "max_bytes": 1500000,
-            "omitted_records": 10788,
+            "candidate_records": 121169,
+            "estimated_bytes": 999766,
+            "max_bytes": 1000000,
+            "omitted_records": 6065,
             "optimality": "largest fitting tested prefix; not a global maximum claim",
             "policy": "priority-prefix-bounded-size-search-v1",
             "priority_hit_records": 71005,
-            "ranking_considered": 173841,
-            "selected_records": 173841
+            "ranking_considered": 115104,
+            "selected_records": 115104
           },
-          "sha256": "84ee21cc2eba74514777b30d4b0c6725338e26c4fe2802c51b229e0bce61b21c",
+          "sha256": "899c134df21c5deee387256676c9df85ac1ce8af955b7503fe5ff95b699fdf44",
           "vocabulary": {
-            "candidate_words_with_breaks": 184629,
+            "candidate_words_with_breaks": 121169,
             "policy": "subset of folded selected DCT; nonempty break lists only",
-            "selected_dictionary_folded_forms": 194009,
-            "selected_dictionary_forms": 194009,
-            "selected_words_with_breaks": 173841
+            "selected_dictionary_folded_forms": 130300,
+            "selected_dictionary_forms": 130300,
+            "selected_words_with_breaks": 115104
           }
         }
       ],
