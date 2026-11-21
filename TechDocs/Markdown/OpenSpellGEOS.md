@@ -1,4 +1,4 @@
-# OpenSpellGEOS for PC/GEOS Ensemble
+# OpenSpellGEOS 1.x for PC/GEOS Ensemble
 
 OpenSpellGEOS replaces the unavailable proprietary implementation behind the
 existing Spell library entry points. It supplies an on-disk lexical reader,
@@ -7,6 +7,36 @@ The public Spell export order, buffer layouts and Preferences interface remain
 intact. The thesaurus adds part-of-speech value 4 for unknown grammar; its UI
 is updated accordingly. External clients must guard against that value before
 indexing an old four-element grammar table.
+
+## Compatibility policy (1.x line)
+
+This is the **OpenSpellGEOS 1.x** line. The upstream project
+(dnesbitt142/OpenSpellGEOS) is moving to 2.x; this fork stays on 1.x and
+guarantees backwards compatibility with every already-published installation.
+The following surfaces are frozen for the entire 1.x line; any change to any of
+them is a 2.x release:
+
+- **OLX1 file format** for `.DCT`, `.THS`, and `.HYP` — the on-disk container,
+  front coding, sparse index, blob arena, and inline-value layout.
+- **`.DCT` extension and one-byte case-flag value schema** — `1` = lowercase
+  (accepts any case), `2` = exact-case only. No grammar rules, affix flags, or
+  morphological data are stored in the file.
+- **5-line CRLF Latin-1 `.GDI` record** — the GEOS Preferences manager contract:
+  dictionary filename, display name, description, decimal language code,
+  decimal dialect code.
+- **Six profile stems**: `EN_US`, `EN_GB`, `DE_DE`, `SV_SE`, `LB_LU`, `FR_FR`.
+- **`sllang.h` language/dialect code mapping** — no new language IDs in 1.x.
+- **Spell library export table** — the 20 `IC*`/`IPGEO*` exports listed in
+  `spell.gp` (names, signatures, calling conventions, and export order).
+- **`ICBuff` field offsets** — already enforced at compile time by
+  `OpenCheckWordOffset`, `OpenCheckCountOffset`, `OpenCheckContextOffset`,
+  and `OpenCheckBufferSize` in `Library/Spell/Open/icgeos.inc`.
+- **Geode protocol** — the library must stay loadable by existing applications
+  built against the current Spell protocol.
+
+The 1.x line may add morphology rules, dictionary data, host build tools, and
+documentation without breaking these surfaces. See
+`OpenSpellGEOSChanges.md` for the change log.
 
 The new source is Apache-2.0. Data retains the notices and permissive terms of
 its sources; compatibility with an Apache-2.0 project does not erase those

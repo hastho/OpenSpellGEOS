@@ -12,6 +12,77 @@ from SpellOpen*.md to OpenSpellGEOS*.md. Technical identifiers such as OLX1,
 OpenLexCode, Spell export names, OPENUSER.USR and Library/Spell/Open remain
 unchanged. .DCT remains the canonical spelling extension.
 
+## v1.1.0 — German morphology benchmark, 1MB surface DCT, bounded runtime rules
+
+This is the first formal semver release of the OpenSpellGEOS 1.x compatibility
+line. Upstream (dnesbitt142/OpenSpellGEOS) is moving to 2.x; this fork stays on
+1.x and keeps backwards compatibility with every already-published `.DCT`,
+`.THS`, `.HYP`, `.GDI`, and the Spell library ABI. See the compatibility policy
+in `OpenSpellGEOS.md`.
+
+### German morphology benchmark
+
+A host benchmark (`TechDocs/Markdown/OpenSpellGEOSMorphologyBenchmark.md`)
+compared the data-only dictionary route against the bounded C89 morphology route
+on 4,000 heise articles (5.6M tokens, 331K types). Key findings:
+
+- Morphology is the dominant coverage lever: +6.9–7.5 pp token coverage at a
+  fixed dictionary, for zero extra disk bytes and +260 bytes of context RAM.
+- Surface-ranked selection beats morphology-aware core/base-form rebuild by
+  5.3 pp (85.9% vs 80.6% at 1.5 MB). The `rebuild_german.py` core-ranking step
+  is deprecated; `build_german_surface.py` replaces it.
+- The shipped upstream `DE_DE.DCT` carries no grammar rules — its per-record
+  value is a single case-flag byte.
+
+### Dictionary
+
+- Rebuilt `DE_DE.DCT` (130,300 records, 999,766 bytes) and `DE_DE.HYP`
+  (115,104 records) at the standard 1 MB per-file budget with the
+  frequency-ranked surface priority (`DE_DE.priority.txt`) via the new
+  `Dictionaries/BuildTools/build_german_surface.py`.
+- Updated `BUILD.json`, `DE_DE.zip`, and the compact-metrics table in
+  `OpenSpellGEOSData.md`.
+
+### Morphology rules (`Library/Spell/Open/openmorph.inc`)
+
+- Widened `SEP_PREFIX` from 15 to 22 entries: added `durch`, `um`, `über`,
+  `unter`, `wieder`, `miss`, `hinter` for separable-prefix participles.
+- Added `olMorphScanUmlautPlural`: bounded noun-plural umlaut probe
+  (German-gated, length ≥ 5, revert umlaut + strip `e`/`er`/`n`/`en`).
+- Fixed `-eln`/`-ern` weak-verb participle: added `stem+n` fallback after
+  `stem+en` (`abgehandelt` → `abhandeln`; +126 corpus accepts, 0 regressions).
+- Fixed aux/modal table encoding: 41 forms had UTF-8 umlaut bytes that never
+  matched mac_roman input; replaced with hex escapes (`\x8a`, `\x9a`, `\x9f`,
+  `\xa7`). Geode shrank 32 bytes.
+
+### Tests and bench harness
+
+- `Library/Spell/Open/test_morph.test`: host C89 harness with fixture `olFind`
+  covering all rule classes (participles, umlaut plurals, aux, compounds).
+- `Library/Spell/Open/test_icgeos.test`: extended with `testMorphology()`.
+- `Dictionaries/BuildTools/bench/`: moved the host benchmark harness into the
+  repo (`bench.c`, `build_variants.py`, `extract_corpus.py`, `analyze.py`,
+  `decide.py`, `run_benchmarks.py`, `heise_sample_1000.txt`, `GNUmakefile`).
+  `make -C Dictionaries/BuildTools/bench bench` builds the variants and
+  asserts the morphology margin on a checked-in heise sample.
+
+### Documentation
+
+- `OpenSpellGEOSMorphology.md`: new "Static tables and code-segment budget"
+  section documenting why `olMorphAuxForms` stays in code (3% of tokens, ~891
+  bytes, 286 fast path), the 2 KB compile-time guard, and the mac_roman
+  encoding rationale.
+- `OpenSpellGEOSData.md`: rewrote German build path section (surface priority
+  + `build_german_surface.py`), marked `rebuild_german.py` not recommended,
+  added `DE_DE.DCT` single-case-flag-byte clarification.
+- `OpenSpellGEOSMorphologyBenchmark.md`: added follow-up sections for the
+  `-eln`/`-ern` participle fix and the aux table encoding fix.
+
+### GDI and geode
+
+- All six `.GDI` files updated to `"OpenSpellGEOS 1.1 (Build 21/11/26)"`.
+- `spell.gp` `usernotes` fixed (typo "buld" → "build") and versioned.
+
 ## Personal dictionary errors and project layout, 2026-10-01
 
 The technical guides now follow the GitHub repository layout. Python builders

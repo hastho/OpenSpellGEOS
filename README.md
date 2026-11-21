@@ -1,5 +1,12 @@
-# OpenSpellGEOS
+# OpenSpellGEOS 1.x
 A Open Source spelling/thesaurus/hyphenation library for PC/GEOS
+
+This is the **OpenSpellGEOS 1.x** line — the compatibility branch. The upstream
+project (dnesbitt142/OpenSpellGEOS) is moving to 2.x; this fork stays on 1.x and
+keeps backwards compatibility with every already-published `.DCT`/`.THS`/`.HYP`,
+the GEOS Preferences manager `.GDI` format, and the Spell library ABI. Any change
+to those frozen surfaces would be a 2.x release; 1.x only adds rules, data, and
+host tooling without breaking installed dictionaries or applications.
 
 ## How to build (once your SDK is set up):
 1. Unpack the `Appl` and `Installed` root level folders to `%ROOT_DIR%`/`$ROOT_DIR`
