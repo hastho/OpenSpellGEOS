@@ -36,26 +36,26 @@
 static const char * const olMorphAuxForms[] = {
     /* sein */
     "bin", "bist", "ist", "sind", "seid", "war", "warst", "waren",
-    "wart", "gewesen", "sei", "seist", "seien", "seid", "wäre",
-    "wären", "wärest", "wär", "wärst",
+    "wart", "gewesen", "sei", "seist", "seien", "seid", "w\x8are",
+    "w\x8aren", "w\x8arest", "w\x8ar", "w\x8arst",
     /* haben */
     "hat", "hast", "hatte", "hattest", "hatten", "hattet", "gehabt",
-    "hätte", "hättest", "hätten", "hättet",
+    "h\x8atte", "h\x8attest", "h\x8atten", "h\x8attet",
     /* werden */
     "wird", "werde", "werdest", "wurde", "wurdest", "wurden", "wurdet",
-    "geworden", "würde", "würdest", "würden", "würdet",
-    /* können */
-    "kann", "kannst", "könnt", "könnte", "könntest", "könnten", "könntet",
-    "gekonnt", "könne", "könnet",
-    /* dürfen */
-    "darf", "darfst", "dürft", "dürfte", "dürftest", "dürften", "dürftet",
-    "gedurft", "dürfe", "dürfet",
-    /* mögen */
-    "mag", "magst", "mögt", "mochte", "mochtest", "mochten", "mochtet",
-    "gemocht", "möchte", "möchtest", "möchten", "möchtet",
-    /* müssen */
-    "muss", "musst", "müsst", "musste", "musstest", "mussten", "musstet",
-    "gemusst", "müsse", "müsset", "müsste", "müssten",
+    "geworden", "w\x9frde", "w\x9frdest", "w\x9frden", "w\x9frdet",
+    /* koennen */
+    "kann", "kannst", "k\x9annt", "k\x9annte", "k\x9anntest", "k\x9annten", "k\x9anntet",
+    "gekonnt", "k\x9anne", "k\x9annet",
+    /* duerfen */
+    "darf", "darfst", "d\x9frft", "d\x9frfte", "d\x9frftest", "d\x9frften", "d\x9frftet",
+    "gedurft", "d\x9frfe", "d\x9frfet",
+    /* moegen */
+    "mag", "magst", "m\x9agt", "mochte", "mochtest", "mochten", "mochtet",
+    "gemocht", "m\x9a" "chte", "m\x9a" "chtest", "m\x9a" "chten", "m\x9a" "chtet",
+    /* muessen */
+    "muss", "musst", "m\x9fsst", "musste", "musstest", "mussten", "musstet",
+    "gemusst", "m\x9fsse", "m\x9fsset", "m\x9fsste", "m\x9fssten",
     /* sollen */
     "soll", "sollst", "sollt", "sollte", "solltest", "sollten", "solltet",
     "gesollt", "solle", "sollet",
@@ -63,8 +63,8 @@ static const char * const olMorphAuxForms[] = {
     "will", "willst", "wollt", "wollte", "wolltest", "wollten", "wolltet",
     "gewollt", "wolle", "wollet",
     /* wissen */
-    "weiß", "weißt", "wusste", "wusstest", "wussten", "wusstet",
-    "gewusst", "wisse", "wisst", "wüsste", "wüssten"
+    "wei\xa7", "wei\xa7t", "wusste", "wusstest", "wussten", "wusstet",
+    "gewusst", "wisse", "wisst", "w\x9fsste", "w\x9fssten"
 };
 #define OL_MORPH_AUX_COUNT \
     ((unsigned short)(sizeof(olMorphAuxForms) / sizeof(olMorphAuxForms[0])))
@@ -131,10 +131,15 @@ static const struct {
 #define OL_MORPH_ENDING_COUNT \
     ((unsigned short)(sizeof(olMorphEndings) / sizeof(olMorphEndings[0])))
 
-/* Separable verb prefixes for the ge-participle reconstruction. */
-static const char olMorphPrefixes[][4] = {
+/* Separable verb prefixes for the ge-participle reconstruction. The 7 added
+ * prefixes (durch, um, ueber, unter, wieder, miss, hinter) close the gap
+ * identified by the morphology benchmark on heise vocabulary; the ge+rest+t
+ * structure keeps the parse unambiguous even for prefixes that are also free
+ * prepositions. Each entry is stored as a small fixed-width byte string. */
+static const char olMorphPrefixes[][7] = {
     "ab", "an", "auf", "aus", "bei", "da", "ein", "her", "hin", "los",
-    "mit", "nach", "vor", "weg", "zu"
+    "mit", "nach", "vor", "weg", "zu",
+    "durch", "um", "\x9f" "ber", "unter", "wieder", "miss", "hinter"
 };
 #define OL_MORPH_PREFIX_COUNT \
     ((unsigned short)(sizeof(olMorphPrefixes) / sizeof(olMorphPrefixes[0])))
@@ -295,6 +300,12 @@ static int OL_CALL olMorphScanEndings(OLContext *lexP,
             if (probe != 0) {
                 return probe;
             }
+            /* Same -eln/-ern fallback as the separable-prefix participle. */
+            probe = olMorphTry(lexP, wordP + 2, stemLength - 2, "n", 1,
+                               workP->candidate, workP->probe);
+            if (probe != 0) {
+                return probe;
+            }
         }
         deumlaut = olMorphDeUmlaut(wordP, workP->inner, stemLength);
         if (deumlaut) {
@@ -431,6 +442,89 @@ static int OL_CALL olMorphScanParticiple(OLContext *lexP,
             if (probe != 0) {
                 return probe;
             }
+            /* -eln/-ern weak verbs form the participle with stem+t but the
+             * infinitive ends in -n, not -en (handeln -> gehandelt). Try the
+             * bare -n suffix after -en fails. No new table; one extra probe. */
+            probe = olMorphTry(lexP, workP->inner, prefixLength + restLength - 1,
+                               "n", 1, workP->candidate, workP->probe);
+            if (probe != 0) {
+                return probe;
+            }
+        }
+    }
+    return 0;
+}
+
+/* Reconstruct noun-plural umlauts: revert the first a/o/u umlaut in the
+ * folded word and probe the result title-cased. This closes the umlaut-only
+ * plural gap (e.g. m\x9ftter -> Mutter, v\x8ater -> Vater) that the existing
+ * ending-strip + stem-de-umlaut path misses, because those plurals add no
+ * suffix and the stem-de-umlaut truncates the base. The existing stem-de-
+ * umlaut path already covers umlaut-plus-suffix plurals (h\x8auser -> Haus);
+ * this probe additionally tries reverting the umlaut in the full word and
+ * stripping one of e/er/n, which is bounded by the plural-ending table.
+ * German-only; the candidate must be at least five characters. Returns one
+ * on a hit, zero on absence, -1 on error. */
+static const char olMorphPluralEndings[][3] = {
+    "e", "er", "n", "en"
+};
+#define OL_MORPH_PLURAL_ENDING_COUNT \
+    ((unsigned short)(sizeof(olMorphPluralEndings) / sizeof(olMorphPluralEndings[0])))
+
+static int OL_CALL olMorphScanUmlautPlural(OLContext *lexP,
+                                           const unsigned char *wordP,
+                                           unsigned short length,
+                                           OLMorphWorkspace *workP)
+{
+    unsigned short ending;
+    unsigned short endingLength;
+    unsigned short stemLength;
+    unsigned short index;
+    unsigned short match;
+    int probe;
+    int deumlaut;
+
+    if (length < 5) {
+        return 0;
+    }
+    deumlaut = olMorphDeUmlaut(wordP, workP->inner, length);
+    if (!deumlaut) {
+        return 0;
+    }
+    /* Full-word de-umlaut, no strip: catches umlaut-only plurals whose base
+     * has the same length as the surface (M\x9ftter -> Mutter). Use workP->part
+     * as the probe scratch so wordP (which may alias workP->candidate in the
+     * zu-infinitive recursion) is not corrupted for later rules. */
+    probe = olMorphProbe(lexP, workP->inner, length, workP->part);
+    if (probe != 0) {
+        return probe;
+    }
+    /* Full-word de-umlaut plus one plural ending strip. This is equivalent
+     * to the existing stem-de-umlaut path for most cases but is kept for
+     * the cases the ordering difference reaches; every candidate must still
+     * be found in the dictionary. */
+    for (ending = 0; ending < OL_MORPH_PLURAL_ENDING_COUNT; ++ending) {
+        endingLength = olMorphTextLength(olMorphPluralEndings[ending]);
+        if (length <= endingLength ||
+            length - endingLength < OL_MORPH_MIN_STEM) {
+            continue;
+        }
+        match = 1;
+        for (index = 0; index < endingLength; ++index) {
+            if (wordP[length - endingLength + index] !=
+                (unsigned char)olMorphPluralEndings[ending][index]) {
+                match = 0;
+                break;
+            }
+        }
+        if (!match) {
+            continue;
+        }
+        stemLength = length - endingLength;
+        probe = olMorphTry(lexP, workP->inner, stemLength, "", 0,
+                          workP->part, workP->probe);
+        if (probe != 0) {
+            return probe;
         }
     }
     return 0;
@@ -465,6 +559,10 @@ static int OL_CALL olMorphScanInner(OLContext *lexP, const unsigned char *wordP,
             return probe;
         }
         probe = olMorphScanParticiple(lexP, wordP, length, workP);
+        if (probe != 0) {
+            return probe;
+        }
+        probe = olMorphScanUmlautPlural(lexP, wordP, length, workP);
         if (probe != 0) {
             return probe;
         }

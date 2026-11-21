@@ -45,10 +45,14 @@ The ending table has 23 entries, ordered longest first. The ending must
 match the word tail before the stem is used. The ge-participle strip runs
 only when the stem starts with `ge` and has at least five characters.
 
-The separable-prefix participle rule tries 15 prefix entries (`ab`, `an`,
+The separable-prefix participle rule tries 22 prefix entries (`ab`, `an`,
 `auf`, `aus`, `bei`, `da`, `ein`, `her`, `hin`, `los`, `mit`, `nach`,
-`vor`, `weg`, `zu`). It reconstructs the infinitive when the word is
-`prefix + ge + rest` and `rest` ends in `t`.
+`vor`, `weg`, `zu`, `durch`, `um`, `über`, `unter`, `wieder`, `miss`,
+`hinter`). It reconstructs the infinitive when the word is
+`prefix + ge + rest` and `rest` ends in `t`. For `-eln`/`-ern` weak verbs
+whose infinitive ends in `-n` rather than `-en` (e.g. `handeln` →
+`abgehandelt`), the rule also probes `prefix + rest + n` after
+`prefix + rest + en` fails.
 
 ### Compound words
 
@@ -74,16 +78,97 @@ Irregular comparatives (`gut` to `besser`), suppletive plurals
 use stay as explicit dictionary entries. The analyzer does not generate
 them.
 
+## Static tables and the code-segment budget
+
+`openmorph.inc` carries five small static tables. Only one of them
+(`olMorphAuxForms`) is lexical data that could in principle live in the
+dictionary; the other four are byte-pattern matchers that must stay in the
+code segment.
+
+| Table | Entries | Bytes | Role | Movable to dict? |
+| --- | ---: | ---: | --- | :---: |
+| `olMorphAuxForms` | 117 | ~791 | aux/modal verb forms (`bin`, `ist`, `war`, `hat`, `wird`, `kann`...) | yes, but kept in code (see below) |
+| `olMorphPrefixes` | 22 | 161 | separable-prefix byte patterns (`ab`, `an`, `auf`...`hinter`) | no — matched against input bytes, not looked up in dict |
+| `olMorphEndings` | 23 | 184 | inflectional ending byte patterns (`en`, `er`, `est`...) | no — stripped from input, not looked up |
+| `olMorphPluralEndings` | 4 | 12 | noun-plural ending byte patterns (`e`, `er`, `n`, `en`) | no — same |
+| `olMorphLinkers` | 7 | 35 | compound linking-element byte patterns (`s`, `es`, `n`...) | no — matched at the split boundary |
+
+### Why `olMorphAuxForms` stays in the code segment
+
+The auxiliary/modal verb table is the one candidate for "move lexical
+knowledge into the dictionary". 112 of its 117 forms are already present as
+exact-match records in the shipped `DE_DE.DCT` (surf1500); only five archaic
+subjunctive-II forms (`könnet`, `dürfet`, `müsset`, `sollet`, `wollet`) are
+absent and would need to be added. Deleting the table and `olMorphScanAux`
+would save ~891 bytes of code segment and add ~50 bytes to the dictionary.
+
+The table is kept in code because it is a **performance cache**, not pure
+lexical data. `olMorphScanAux` runs first in `olMorphScanInner` and accepts
+these forms with one bounded linear scan over short strings and zero I/O.
+Without it, every aux/modal form would flow through the ending-strip,
+participle, umlaut-plural and compound paths before being accepted, adding
+~20 `olFind` probes per word.
+
+On the 200,000-token heise stream, aux/modal forms account for 3.03% of all
+tokens (6,067 occurrences). These are the most common German verbs
+(`ist`, `hat`, `war`, `wird`, `kann`, `soll`, `will`, `wurde`, ...). On a
+286 with a floppy-drive-backed dictionary, the extra probes per aux word
+are a measurable lookup-time regression on exactly the most frequent
+tokens. The 891 bytes saved is ~1.8% of the geode's fixed code; the trade
+is **fast path for the most common words vs. code size**, and the fast
+path wins on a 286.
+
+A compile-time guard (`OlMorphAuxSizeCheck`) rejects any build that lets the
+table grow past 2,048 bytes, so the table cannot silently bloat the code
+segment. If a future maintainer needs the ~891 bytes for another rule, the
+move-to-dict path is the documented fallback: delete the table and
+`olMorphScanAux`, add the five missing forms to `DE_DE.priority.txt`, and
+accept the ~4× probe cost on the 3% of tokens that are aux/modal forms.
+
+The umlaut-bearing forms in the table (e.g. `wäre`, `hätte`, `würde`,
+`könnte`, `weiß`) are stored with explicit mac_roman hex escapes
+(`\x8a` for ä, `\x9a` for ö, `\x9f` for ü, `\xa7` for ß), not UTF-8. The
+spell checker processes input in GEOS SBCS (mac_roman); a C string literal
+containing a raw UTF-8 umlaut (two bytes, e.g. `0xC3 0xA4`) would never
+match a one-byte mac_roman input (e.g. `0x8A`). Forms like `m\x9a" "chte"`
+use C string concatenation to prevent the hex escape from consuming the
+following hex digit (`c`), which would produce an out-of-range character
+constant.
+
+### What the other tables are not
+
+The four pattern-matching tables (`olMorphPrefixes`, `olMorphEndings`,
+`olMorphPluralEndings`, `olMorphLinkers`) are **not** dictionary entries.
+They are byte patterns matched against the input spelling's own bytes —
+e.g. `olMorphPrefixes` checks that the input starts with `ab` before
+looking for `ab + ge + rest + t`. Moving them to the dictionary would
+require a round-trip lookup per pattern, which is slower than the current
+direct byte comparison and adds no attestation value (the attestation is
+already done by the `olFind` probe on the reconstructed stem). They stay
+in the code segment by design.
+
 ## Documented gaps
 
 - Strong-verb pure participles such as `geschoben` from `schieben` are not
   accepted unless the participle itself has an adjectival declension family
   and is stored as a base. The ablaut back-mapping from `o` to `ie` is not
-  in the rule set because it is ambiguous.
+  in the rule set because it is ambiguous. The benchmark showed that the
+  most frequent strong-verb participles (`gegangen`, `geschrieben`,
+  `getrunken`, ...) are already present as exact entries in the surf1500
+  dictionary, so no code rule is needed for them. See
+  `TechDocs/Markdown/OpenSpellGEOSMorphologyBenchmark.md`.
 - Noun plurals that use umlaut only, such as `Wände` from `Wand`, are
-  accepted only when the singular is in the dictionary. The Free German
-  Dictionary source does not contain `Wand` (the singular noun), so
-  `Wände` stays unknown. This is a source-data gap, not a rule limitation.
+  accepted when the singular is in the dictionary. The bounded
+  `olMorphScanUmlautPlural` probe reverts the umlaut in the full word and
+  strips one of `e`/`er`/`n`/`en`, so `Mütter` → `Mutter` and `Häuser` →
+  `Haus` now resolve without a stored plural. The Free German Dictionary
+  source does not contain every singular noun (e.g. `Wand`), so `Wände`
+  stays unknown. This is a source-data gap, not a rule limitation.
+- `-eln`/`-ern` weak-verb participles (`abhandeln` → `abgehandelt`) are
+  now accepted via the `stem + n` fallback in the participle rule; the
+  original `stem + en` probe produced the wrong infinitive for this verb
+  class. See the "Follow-up" section in
+  `TechDocs/Markdown/OpenSpellGEOSMorphologyBenchmark.md`.
 - Compound parts are checked with case probes and one linking-element strip
   only. Deeper part analysis, such as inflection stripping on a compound
   part, is a documented upgrade.
@@ -112,38 +197,43 @@ with lower false acceptance.
 
 ## Data rebuild
 
-The German dictionary was rebuilt with a morphology-aware ranking that
-selects base forms. The ranking identifies cores: attested forms whose
-morphology family has at least four attested relatives for lowercase forms
-or two for capitalized nouns. The cores replace the previous length-ordered
-fallback in the priority file. The compound tier was removed from the
-priority because the analyzer validates compounds at runtime.
+The German dictionary is built with the standard frequency-ranked surface
+priority (`Dictionaries/BuildTools/Data/DE_DE.priority.txt`) via
+`Dictionaries/BuildTools/build_german_surface.py`, not the morphology-aware
+core/base-form rebuild. The benchmark in
+`TechDocs/Markdown/OpenSpellGEOSMorphologyBenchmark.md` measured that
+surface-ranked selection plus runtime morphology reaches 85.9% token
+coverage on a 4,000-article heise corpus, beating the core/base-form
+rebuild (80.6%) by 5.3 percentage points. German inflection is handled at
+runtime by `openmorph.inc`; the dictionary keeps the most frequent surface
+forms so the cheap exact path fires often.
 
 | File | Records | Bytes |
 | --- | ---: | ---: |
-| DE_DE.DCT | 162,329 | 1,499,617 |
-| DE_DE.HYP | 139,479 | 1,499,617 |
+| DE_DE.DCT | 194,009 | 1,499,617 |
+| DE_DE.HYP | 173,841 | 1,499,617 |
 
 The DCT and HYP are at the 1,500,000-byte budget. The THS and GDI files
 are unchanged. The ranking uses only the pinned Free German Dictionary
-snapshot and original morphology rules. No external corpus or
-copyleft-licensed data is used.
+snapshot. No external corpus or copyleft-licensed data is used.
 
 ### Rebuild tool
 
-The script `Dictionaries/BuildTools/rebuild_german.py` automates the
-morphology-aware rebuild. It requires the extracted Data snapshot
-(`Dictionaries/BuildTools/Data/`) and produces `DE_DE.DCT` and `DE_DE.HYP`.
+The script `Dictionaries/BuildTools/build_german_surface.py` automates the
+surface-ranked rebuild at the German 1,500,000-byte budget. It requires the
+extracted Data snapshot (`Dictionaries/BuildTools/Data/`).
 
 ```text
-python3 Dictionaries/BuildTools/rebuild_german.py --budget 1500000
+python3 Dictionaries/BuildTools/build_german_surface.py --budget 1500000
 ```
 
-The `--budget` option sets the per-file byte ceiling. The sweet-spot
-analysis recommends 1,500,000 bytes for German. The script rebuilds the
-priority file with the morphology-core ranking, selects the fitting prefix,
-writes the DCT, regenerates the HYP from the selected vocabulary, and
-removes its temporary files.
+The `--budget` option sets the per-file byte ceiling (default 1,500,000).
+The script selects entries with the surface priority, writes the DCT,
+regenerates the HYP from the selected vocabulary, and removes its temporary
+files. The deprecated `rebuild_german.py` (morphology-aware core ranking)
+is retained for reference but is not the default and not recommended; see
+`TechDocs/Markdown/OpenSpellGEOSData.md` and
+`TechDocs/Markdown/OpenSpellGEOSMorphologyBenchmark.md` for the evidence.
 
 ### Corpus coverage tool
 

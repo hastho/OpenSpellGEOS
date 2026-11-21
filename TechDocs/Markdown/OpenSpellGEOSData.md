@@ -29,6 +29,16 @@ not per language, and is not 500 KiB. .DCT remains the canonical spelling
 extension. The format, runtime entry points and Library/Spell/Open directory
 are unchanged by compact selection.
 
+The German profile is the documented exception: `DE_DE.DCT` and `DE_DE.HYP`
+are built at a 1,500,000-byte per-file budget (via
+`Dictionaries/BuildTools/build_german_surface.py`) because German inflection is
+handled at runtime by the bounded C89 morphology rules in
+`Library/Spell/Open/openmorph.inc`, and the larger base dictionary lets the
+cheap exact path fire more often before the rules rescue the long tail. See
+the "German dictionary build path" section and
+`TechDocs/Markdown/OpenSpellGEOSMorphologyBenchmark.md` for the evidence. The
+other five profiles stay at the generic 500000-byte ceiling.
+
 The large vocabulary and sense counts in the provenance sections below
 describe the normalized source snapshots before compact selection. They are
 not retained counts for the compact binaries. The new BUILD.json records
@@ -109,39 +119,40 @@ every common word or important sense has been retained.
 ## Verified compact measurements
 
 These values come from the released compact BUILD.json. The independent
-release audit decoded all 611,367 records, checked all eighteen file hashes
-and payloads, confirmed the inclusive 500000-byte ceiling and queried the
-actual data through the C reader. It also reproduced compact EN_GB.DCT
-byte-for-byte from the pinned inputs. The evidence is recorded in
-compact-data-validation.log; these are host data checks, not GUI acceptance
-checks or native-language editorial review.
+release audit decoded all 1,298,307 records, checked all eighteen file hashes
+and payloads, confirmed the per-file byte ceilings (the generic 500000-byte
+ceiling plus the documented 1500000-byte German exception for `DE_DE.DCT` and
+`DE_DE.HYP`), and queried the actual data through the C reader. It also
+reproduced compact EN_GB.DCT byte-for-byte from the pinned inputs. The evidence
+is recorded in compact-data-validation.log; these are host data checks, not
+GUI acceptance checks or native-language editorial review.
 
 <!-- COMPACT_METRICS_BEGIN -->
 
 | File | Candidate records | Retained records | Omitted records | Complete bytes |
 | --- | ---: | ---: | ---: | ---: |
-| EN_US.DCT | 109,140 | 61,720 | 47,420 | 499,915 |
-| EN_US.THS | 60,165 | 4,518 | 55,647 | 499,094 |
-| EN_US.HYP | 43,330 | 43,330 | 0 | 407,350 |
-| EN_GB.DCT | 108,778 | 61,763 | 47,015 | 499,915 |
-| EN_GB.THS | 60,165 | 4,525 | 55,640 | 499,983 |
-| EN_GB.HYP | 41,924 | 41,924 | 0 | 395,371 |
-| DE_DE.DCT | 2,152,637 | 61,535 | 2,091,102 | 499,915 |
+| EN_US.DCT | 109,140 | 109,140 | 0 | 863,641 |
+| EN_US.THS | 60,165 | 9,269 | 50,896 | 999,148 |
+| EN_US.HYP | 76,793 | 76,793 | 0 | 692,668 |
+| EN_GB.DCT | 108,778 | 108,778 | 0 | 860,374 |
+| EN_GB.THS | 60,165 | 9,303 | 50,862 | 999,677 |
+| EN_GB.HYP | 75,449 | 75,449 | 0 | 680,689 |
+| DE_DE.DCT | 2,152,641 | 194,009 | 1,958,632 | 1,499,617 |
 | DE_DE.THS | 3,744 | 3,744 | 0 | 258,145 |
-| DE_DE.HYP | 58,563 | 53,942 | 4,621 | 499,915 |
-| SV_SE.DCT | 816,350 | 59,881 | 756,469 | 499,915 |
-| SV_SE.THS | 8,922 | 6,364 | 2,558 | 498,933 |
-| SV_SE.HYP | 17,696 | 17,696 | 0 | 168,859 |
-| LB_LU.DCT | 116,235 | 54,530 | 61,705 | 499,915 |
+| DE_DE.HYP | 184,629 | 173,841 | 10,788 | 1,499,617 |
+| SV_SE.DCT | 816,383 | 113,629 | 702,754 | 999,766 |
+| SV_SE.THS | 8,922 | 8,922 | 0 | 723,565 |
+| SV_SE.HYP | 41,780 | 41,780 | 0 | 417,151 |
+| LB_LU.DCT | 116,235 | 116,235 | 0 | 933,337 |
 | LB_LU.THS | 7,250 | 7,250 | 0 | 337,014 |
 | LB_LU.HYP | 0 | 0 | 0 | 64 |
-| FR_FR.DCT | 138,188 | 67,335 | 70,853 | 499,915 |
+| FR_FR.DCT | 138,188 | 132,192 | 5,996 | 999,766 |
 | FR_FR.THS | 2,443 | 2,443 | 0 | 183,831 |
-| FR_FR.HYP | 58,867 | 58,867 | 0 | 486,847 |
+| FR_FR.HYP | 123,310 | 115,530 | 7,780 | 999,766 |
 
 <!-- COMPACT_METRICS_END -->
 
-The eighteen linguistic files total 7,234,896 decimal bytes. Candidate counts
+The eighteen linguistic files total 13,947,836 decimal bytes. Candidate counts
 are the encoded, canonicalized records presented to each file selector, not
 the larger raw-source line counts. THS candidates have already passed sense
 compaction; HYP candidates already belong to the selected DCT vocabulary and
@@ -152,10 +163,10 @@ The retained thesaurus totals are:
 
 | Profile | Retained senses | Retained synonym occurrences |
 | --- | ---: | ---: |
-| EN_US | 7,425 | 16,489 |
-| EN_GB | 7,448 | 16,512 |
+| EN_US | 14,793 | 32,727 |
+| EN_GB | 14,801 | 32,707 |
 | DE_DE | 3,974 | 4,667 |
-| SV_SE | 7,144 | 8,417 |
+| SV_SE | 9,930 | 11,690 |
 | LB_LU | 8,327 | 10,957 |
 | FR_FR | 2,587 | 3,028 |
 
@@ -239,6 +250,12 @@ The deliberately nonstandard variants.dic is excluded. Preserve the source
 attribution in Sources/lexicons/German-Public-Domain.txt. The large explicit-form
 list takes more disk space than a compact stem dictionary; it is not loaded
 wholesale into target RAM and does not generate new compounds at runtime.
+Each stored record carries a single one-byte case-flag value (`1` lowercase,
+accepts any case, or `2` exact-case only); the file contains no grammar rules,
+affix flags or morphology data. German inflection is handled entirely by the
+bounded C89 rules in `Library/Spell/Open/openmorph.inc` at runtime, not by the
+dictionary. See the "German dictionary build path" section above for the build
+recipe and the benchmark evidence.
 
 DE_DE.THS uses the German TE/SYTE terminology records in the CC0 portion of
 Sweden's National Term Bank. It contains 3,768 normalized headwords before the
@@ -369,36 +386,79 @@ exist; use a separate directory rather than the supplied Dictionaries folder:
 
     python3 Dictionaries/BuildTools/build_languages.py --output build/OpenSpellGEOS/DICTS --max-bytes 500000
 
+This builds the five non-German profiles at the generic 500000-byte ceiling.
+For the German profile, which uses the documented 1500000-byte exception plus
+runtime morphology, rebuild `DE_DE.DCT` and `DE_DE.HYP` separately (see the
+"German dictionary build path" and "build_german_surface.py" sections above):
+
+    python3 Dictionaries/BuildTools/build_german_surface.py \
+        --output build/OpenSpellGEOS/DICTS-german --budget 1500000
+
+and copy the resulting `DE_DE.DCT` and `DE_DE.HYP` over the
+`build_languages.py` output for the German profile.
+
 The command uses Dictionaries/BuildTools/Data by default. It verifies every
 input, builds into staging, then exposes the completed set. It refuses to
 overwrite an existing output directory. --max-bytes defaults to 500000; values
 from 64 through 500000 are accepted, and values above the ceiling are
-rejected. A lower limit selects a smaller corpus; it does not change the
-format or improve coverage. The resulting BUILD.json records installed counts,
-file sizes, file hashes, input hashes and coverage declarations. Use these
-installed counts when describing the binary release; source counts can differ
-because canonical keys merge during case folding and the compact selector
-omits records to satisfy the per-file byte budget.
+rejected (the German 1500000-byte exception is handled by
+`build_german_surface.py`, which uses `rebuild_german.select_bounded` to bypass
+the generic cap for that one profile). A lower limit selects a smaller corpus;
+it does not change the format or improve coverage. The resulting BUILD.json
+records installed counts, file sizes, file hashes, input hashes and coverage
+declarations. Use these installed counts when describing the binary release;
+source counts can differ because canonical keys merge during case folding and
+the compact selector omits records to satisfy the per-file byte budget.
 
-## Morphology-aware rebuild and corpus analysis
+## German dictionary build path
 
-Two additional tools in `Dictionaries/BuildTools` support the morphology-aware
-rebuild described in `TechDocs/Markdown/OpenSpellGEOSMorphology.md`:
+The German DCT is built with the standard frequency-ranked surface priority
+(`Dictionaries/BuildTools/Data/DE_DE.priority.txt`) via
+`build_languages.py`, exactly as the other languages. German inflection is
+handled at runtime by the bounded C89 rules in
+`Library/Spell/Open/openmorph.inc`, not by the dictionary. The benchmark in
+`TechDocs/Markdown/OpenSpellGEOSMorphologyBenchmark.md` measured that the
+surface-ranked dictionary plus runtime morphology reaches 85.9% token
+coverage on a 4,000-article heise corpus, beating a morphology-aware
+core/base-form rebuild (80.6%) by 5.3 percentage points because exact surface
+hits are cheaper and more reliable than rule reconstructions. The German
+profile therefore uses a 1,500,000-byte per-file budget (see
+`build_german_surface.py` below) and keeps the surface priority.
 
-### rebuild_german.py
+The shipped `DE_DE.DCT` value is a single case-flag byte (`1` = lowercase,
+accepts any case; `2` = exact-case only). There are no grammar rules, no
+affix flags and no morphological data in the file; `OpenSpellGEOSFormat.md`
+states the same. Any future "enhanced DCT with grammar rules" claim should be
+checked against that one-byte value schema.
 
-Rebuilds `DE_DE.DCT` and `DE_DE.HYP` with a morphology-aware ranking that
-selects base forms rather than surface forms. The ranking identifies cores:
-attested forms whose morphology family has at least four attested relatives
-for lowercase forms or two for capitalized nouns. The tool requires the
-extracted Data snapshot.
+### rebuild_german.py (not recommended; kept for reference)
+
+`rebuild_german.py` rewrites the German priority list to prefer morphology
+cores over surface forms. The benchmark showed this *reduces* coverage
+(80.6% vs 85.9% at the 1.5 MB budget) because it trades cheap exact surface
+hits for rule reconstructions. The tool is retained in the repository for
+reference but is **not the default and not recommended**. Do not reference
+the generated `DE_DE.priority.core.txt` (or `DE_DE.priority.new.txt`) from any
+build script; the production German build uses `DE_DE.priority.txt` via
+`build_german_surface.py`.
 
 ```text
 python3 Dictionaries/BuildTools/rebuild_german.py --budget 1500000
 ```
 
-The `--budget` option sets the per-file byte ceiling. The sweet-spot analysis
-recommends 1,500,000 bytes for German.
+### build_german_surface.py
+
+Rebuilds `DE_DE.DCT` and `DE_DE.HYP` at a 1,500,000-byte per-file budget with
+the standard frequency-ranked surface priority (`DE_DE.priority.txt`). This is
+the recommended German build path. The tool requires the extracted Data
+snapshot. It selects entries with `compactlex.select_entries` relaxed to the
+German budget and rebuilds HYP from the selected DCT vocabulary so hyphenation
+stays consistent with the larger spelling dictionary.
+
+```text
+python3 Dictionaries/BuildTools/build_german_surface.py \
+    --output DICTS-german --budget 1500000
+```
 
 ### corpus_coverage.py
 

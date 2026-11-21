@@ -15,3 +15,10 @@ Thumbs.db
 # Generated HTML and PDF documents
 TechDocs/HTML/
 TechDocs/PDF/
+
+# German morphology bench build artifacts (rebuilt by run_benchmarks.py)
+Dictionaries/BuildTools/bench/bench
+Dictionaries/BuildTools/bench/dicts/
+
+# Backup of the pre-benchmark German zip (kept locally only)
+Dictionaries/DE_DE.zip.bak

@@ -1,0 +1,243 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ * Host-only regression checks for the bounded German morphology analyzer.
+ *
+ * Build from Library/Spell/Open:
+ *   cc -x c -std=c89 -pedantic -Wall -Wextra -I. test_morph.test -o test_morph \
+ *      && ./test_morph
+ *
+ * This harness links the portable C89 reader (openlex.inc) and the morphology
+ * analyzer (openmorph.inc) unmodified, but supplies a fixed in-memory olFind
+ * fixture instead of a real .DCT. It validates that olMorphCheck accepts and
+ * rejects the spellings the bounded rules are supposed to cover, including the
+ * separable-prefix participle and noun-plural umlaut reconstructions added in
+ * response to the morphology benchmark (see
+ * TechDocs/Markdown/OpenSpellGEOSMorphologyBenchmark.md). The .DCT carries
+ * only case-flag bytes in production; the fixture mirrors that one-byte
+ * value schema. GEOS SBCS umlaut bytes: ae=0x8A oe=0x9A ue=0x9F.
+ */
+#include <assert.h>
+#include <stdio.h>
+#include <string.h>
+
+#define OPEN_SPELL_HOST_TEST
+#define OL_CALL
+#include "openlex.h"
+
+/* Use the real case tables from openlex.inc, then replace olFind with a
+ * fixture. The fixture set is kept small on purpose: the morphology rules
+ * must reconstruct the stored base from the inflected surface form. */
+#define olFind testCoreFind
+#include "openlex.inc"
+#undef olFind
+
+#include "openmorph.inc"
+
+/* Each fixture entry is a base form the morphology engine must reconstruct.
+ * Nouns are stored title-cased with OL_FOLD_CASE (1) so the title-case probe
+ * in olMorphProbe accepts them; lowercase verb infinitives use OL_FOLD_CASE
+ * so the folded probe also accepts. */
+struct MorphEntry {
+    const char *word;      /* mac_roman bytes, NUL-terminated */
+    unsigned char flag;    /* OL_FOLD_CASE or OL_EXACT_CASE */
+};
+static const struct MorphEntry morphEntries[] = {
+    /* Existing separable-prefix infinitives (unchanged 15-entry table). */
+    { "abmachen", 1 },         /* ab+ge+mach+t -> abmachen */
+    { "zumachen", 1 },         /* zu+ge+mach+t -> zumachen */
+    { "mitmachen", 1 },        /* mit+ge+mach+t -> mitmachen */
+    /* -eln/-ern weak-verb infinitives for the participle-rule regression.
+     * The participle of these ends in stem+t (handeln -> gehandelt), so the
+     * infinitive must be reconstructed with stem+n, not stem+en. */
+    { "abhandeln", 1 },        /* abgehandelt -> abhandeln */
+    { "anordnen", 1 },         /* angeordnet -> anordnen */
+    { "abwickeln", 1 },        /* abgewickelt -> abwickeln */
+    { "anmelden", 1 },         /* angemeldet -> anmelden */
+    { "anfordern", 1 },        /* angefordert -> anfordern */
+    { "umwandeln", 1 },        /* umgewandelt -> umwandeln */
+    { "ansteuern", 1 },        /* angesteuert -> ansteuern */
+    /* New separable-prefix infinitives (added prefixes durch/um). These need
+     * the participle rule to reconstruct the infinitive; the compound rule
+     * does not rescue them because the ge-rest is not a stored fixture key.
+     * All four are -en infinitives (the participle rule adds -en back). */
+    { "durchf" "\x9f" "hren", 1 },   /* durch+ge+führ+t -> durchführen */
+    { "durchreisen", 1 },     /* durch+ge+reis+t -> durchreisen */
+    { "umsetzen", 1 },        /* um+ge+setz+t -> umsetzen */
+    { "umspielen", 1 },       /* um+ge+spiel+t -> umspielen */
+    /* Compound parts that rescue durchgef\x9fhrt via the existing compound
+     * rule; kept so the new participle rule does not regress that path. */
+    { "durch", 1 },
+    { "gef" "\x9f" "hrt", 1 },   /* geführt: right head for durch+geführt */
+    /* Noun bases for the umlaut-plural probe; title-cased with FOLD_CASE so
+     * olMorphProbe's title-case probe accepts them. */
+    { "Haus", 1 },            /* Häuser -> Haus (existing stem-deumlaut path) */
+    { "Mutter", 1 },          /* Mütter -> Mutter (new full-word de-umlaut path) */
+    { "Vater", 1 },           /* Väter -> Vater (new full-word de-umlaut path) */
+    { "Stab", 1 },            /* Stäbe -> Stab (existing stem-deumlaut path) */
+    { "Buch", 1 },            /* Bücher -> Buch (existing stem-deumlaut path) */
+    { "Gans", 1 },            /* Gänse -> Gans (existing stem-deumlaut path) */
+    { "Mann", 1 },            /* Männer -> Mann (existing stem-deumlaut path) */
+    /* -eln/-ern weak-verb infinitives for the participle-rule regression. */
+    { "handeln", 1 },         /* gehandelt -> handeln (non-prefix -eln) */
+    { "melden", 1 },          /* gemeldet -> melden (non-prefix -en) */
+    /* The documented false-accept base for the ending-strip rule. */
+    { "Stadt", 1 },           /* stadts -> Stadt (0.07% false-accept, bounded) */
+};
+#define MORPH_ENTRY_COUNT \
+    ((unsigned short)(sizeof(morphEntries) / sizeof(morphEntries[0])))
+
+static unsigned char morphLookup(OLContext *contextP, const unsigned char *keyP,
+                                unsigned short length, unsigned char *valueP,
+                                unsigned short capacity,
+                                unsigned short *lengthP)
+{
+    unsigned short i;
+    (void)contextP;
+    (void)capacity;
+    for (i = 0; i < MORPH_ENTRY_COUNT; ++i) {
+        const char *entry = morphEntries[i].word;
+        unsigned short entryLen = 0;
+        while (entry[entryLen] != 0) {
+            ++entryLen;
+        }
+        if (entryLen != length) {
+            continue;
+        }
+        if (memcmp(entry, keyP, length) == 0) {
+            valueP[0] = morphEntries[i].flag;
+            *lengthP = 1;
+            return 1;
+        }
+    }
+    *lengthP = 0;
+    return 0;
+}
+
+/* Host fixture for olFind: replaces the file-backed reader used by bench.c.
+ * Returns 1 with a one-byte case flag for any fixture key, 0 for absence. */
+int olFind(OLContext *contextP, const unsigned char *keyP,
+           unsigned short keyLength, unsigned char *valueP,
+           unsigned short capacity, unsigned short *lengthP)
+{
+    assert(contextP && keyP && valueP && capacity == 1 && lengthP);
+    return morphLookup(contextP, keyP, keyLength, valueP, capacity, lengthP);
+}
+
+static OLContext lexContext;
+static OLMorphWorkspace morphWorkspace;
+
+/* Reset state between cases; olMorphCheck must not depend on stale data. */
+static void morphReset(void)
+{
+    memset(&morphWorkspace, 0, sizeof(morphWorkspace));
+    memset(&lexContext, 0, sizeof(lexContext));
+}
+
+/* Fold a mac_roman spelling to lower case using the real GEOS case map. */
+static unsigned short foldInput(const char *input, unsigned char *outP)
+{
+    unsigned short i;
+    for (i = 0; input[i] != 0; ++i) {
+        outP[i] = olLower((unsigned char)input[i]);
+    }
+    outP[i] = 0;
+    return i;
+}
+
+static int morphFailures;
+
+/* Assert olMorphCheck returns the expected decision for a folded input.
+ * Reports mismatches without aborting so a single run shows every gap. */
+static void morphExpect(const char *input, int expected,
+                        unsigned char language, const char *label)
+{
+    unsigned char folded[OL_KEY_MAX + 1];
+    unsigned short length;
+    int result;
+
+    length = foldInput(input, folded);
+    morphReset();
+    result = olMorphCheck(&lexContext, folded, length, &morphWorkspace,
+                          language);
+    if (result != expected) {
+        fprintf(stderr, "morph: expected %d got %d for \"%s\" (%s, lang=%u)\n",
+                expected, result, input, label, (unsigned)language);
+        ++morphFailures;
+    }
+}
+
+static void morphAccept(const char *input, unsigned char language,
+                        const char *label)
+{
+    morphExpect(input, 1, language, label);
+}
+
+static void morphReject(const char *input, unsigned char language,
+                        const char *label)
+{
+    morphExpect(input, 0, language, label);
+}
+
+int main(void)
+{
+    /* SL_GERMAN = 6. */
+    const unsigned char german = OL_MORPH_LANG_GERMAN;
+    const unsigned char english = 1;
+
+    /* Existing separable-prefix participles (unchanged 15-entry table). */
+    morphAccept("abgemacht", german, "ab participle");
+    morphAccept("zugemacht", german, "zu participle");
+    morphAccept("mitgemacht", german, "mit participle");
+
+    /* -eln/-ern weak-verb separable-prefix participles (algorithm fix). The
+     * participle of handeln is gehandelt (stem+t), so the infinitive is
+     * reconstructed with stem+n, not stem+en. Without the fix the rule would
+     * probe abhandelen (wrong) and miss. */
+    morphAccept("abgehandelt", german, "ab -eln participle");
+    morphAccept("umgewandelt", german, "um -eln participle");
+    morphAccept("angesteuert", german, "an -ern participle");
+
+    /* Same fix for the non-prefix ge- block in olMorphScanEndings. */
+    morphAccept("gehandelt", german, "non-prefix -eln participle");
+    morphAccept("gemeldet", german, "non-prefix -en participle");
+
+    /* New separable-prefix participles (added prefixes durch/um). These need
+     * the participle rule to reconstruct the infinitive; the compound rule
+     * does not rescue them because the ge-rest is not a stored fixture key. */
+    morphAccept("durchgereist", german, "durch participle");
+    morphAccept("umgesetzt", german, "um participle");
+    morphAccept("umgespielt", german, "um participle");
+
+    /* durchgef\x9fhrt is already rescued by the compound rule (durch +
+     * gef\x9fhrt); this guards that path against regression when the new
+     * participle rule is added. */
+    morphAccept("durchgef" "\x9f" "hrt", german, "durch compound+participle");
+
+    /* Noun-plural umlaut reconstructions (new bounded probe). The
+     * umlaut-only plurals (Mütter, Väter) need the new full-word de-umlaut
+     * path; the umlaut-plus-suffix plurals are already handled by the
+     * existing stem-de-umlaut path and are kept as regression guards. */
+    morphAccept("m" "\x9f" "tter", german, "Mutter plural");
+    morphAccept("v" "\x8a" "ter", german, "Vater plural");
+    morphAccept("h" "\x8a" "user", german, "Haus plural (stem path)");
+    morphAccept("st" "\x8a" "be", german, "Stab plural (stem path)");
+    morphAccept("b" "\x9f" "cher", german, "Buch plural (stem path)");
+    morphAccept("g" "\x8a" "nse", german, "Gans plural (stem path)");
+    morphAccept("m" "\x8a" "nner", german, "Mann plural (stem path)");
+
+    /* The new umlaut-plural probe must not fire for non-German languages. */
+    morphReject("m" "\x9f" "tter", english, "non-German umlaut plural");
+
+    /* Minimum-length discipline: candidates below the bound are not probed. */
+    morphReject("m" "\x9f" "t", german, "too short for umlaut plural");
+
+    /* Nonsense strings must stay rejected. */
+    morphReject("zzzzzzzz", german, "nonsense");
+    morphReject("qxq" "\x8a" "rger", german, "nonsense with umlaut");
+
+    /* The original benchmark false-accept case stays bounded. */
+    morphAccept("stadts", german, "documented false-accept (Stadt+s)");
+
+    printf("morphology checks passed\n");
+    return morphFailures ? 1 : 0;
+}

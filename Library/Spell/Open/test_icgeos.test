@@ -374,6 +374,42 @@ int olFind(OLContext *contextP, const unsigned char *keyP, unsigned short length
         !strcmp((const char *)keyP, "\x80" "ddi")) {
         valueP[0] = 2; *sizeP = 1; return 1;
     }
+    /* German base forms for the morphology regression in testMorphology.
+     * Lowercase verb infinitives and the compound/participle parts use the
+     * OL_FOLD_CASE flag (1); title-case nouns use the same flag so the
+     * title-case probe in olMorphProbe accepts them. GEOS SBCS umlaut
+     * bytes: ae=0x8A oe=0x9A ue=0x9F. The inflected surface forms themselves
+     * (durchgef\x9fhrt, h\x8auser, m\x9ftter, ...) are deliberately absent so
+     * the exact path misses and the bounded rules must reconstruct the base. */
+    if (!strcmp((const char *)keyP, "durch") ||
+        !strcmp((const char *)keyP, "gef" "\x9f" "hrt") ||
+        !strcmp((const char *)keyP, "durchf" "\x9f" "hren") ||
+        !strcmp((const char *)keyP, "durchreisen") ||
+        !strcmp((const char *)keyP, "umsetzen") ||
+        !strcmp((const char *)keyP, "umspielen") ||
+        !strcmp((const char *)keyP, "abmachen") ||
+        !strcmp((const char *)keyP, "zumachen") ||
+        !strcmp((const char *)keyP, "mitmachen") ||
+        !strcmp((const char *)keyP, "handeln") ||
+        !strcmp((const char *)keyP, "melden") ||
+        !strcmp((const char *)keyP, "abhandeln") ||
+        !strcmp((const char *)keyP, "anordnen") ||
+        !strcmp((const char *)keyP, "abwickeln") ||
+        !strcmp((const char *)keyP, "anmelden") ||
+        !strcmp((const char *)keyP, "anfordern") ||
+        !strcmp((const char *)keyP, "umwandeln") ||
+        !strcmp((const char *)keyP, "ansteuern") ||
+        !strcmp((const char *)keyP, "haus") ||
+        !strcmp((const char *)keyP, "Haus") ||
+        !strcmp((const char *)keyP, "Mutter") ||
+        !strcmp((const char *)keyP, "Vater") ||
+        !strcmp((const char *)keyP, "Stab") ||
+        !strcmp((const char *)keyP, "Buch") ||
+        !strcmp((const char *)keyP, "Gans") ||
+        !strcmp((const char *)keyP, "Mann") ||
+        !strcmp((const char *)keyP, "Stadt")) {
+        valueP[0] = 1; *sizeP = 1; return 1;
+    }
     return 0;
 }
 
@@ -707,10 +743,78 @@ static void testRealDictionaries(const char *directoryP)
     puts("real dictionary adapter checks passed (six corrections)");
 }
 
+/* Exercise the bounded German morphology rules through the public ICGEOSpl
+ * entry point with a German ICBuff and the German base forms registered in the
+ * olFind fixture above. Verifies the separable-prefix participle and noun-
+ * plural umlaut reconstructions added in response to the morphology
+ * benchmark. See TechDocs/Markdown/OpenSpellGEOSMorphologyBenchmark.md. */
+static void testMorphology(void)
+{
+    MemHandle bufferH;
+    ICBuff *bufferP;
+    /* SL_GERMAN = 6. */
+    bufferH = testNewBuffer();
+    assert(ICGEOSplInitICBuff(bufferH) == OPEN_OK);
+    bufferP = (ICBuff *)MemLock(bufferH);
+    bufferP->ICB_language = 6;
+    MemUnlock(bufferH);
+
+    /* Existing separable-prefix participles (unchanged 15-entry table). */
+    assert(ICGEOSpl((unsigned char *)"abgemacht", bufferH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"zugemacht", bufferH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"mitgemacht", bufferH) == OPEN_FOUND);
+
+    /* New separable-prefix participles (added prefixes durch/um). The
+     * compound rule does not rescue durchgereist because "gereist" is not a
+     * fixture key, so the participle rule must reconstruct "durchreisen". */
+    assert(ICGEOSpl((unsigned char *)"durchgereist", bufferH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"umgesetzt", bufferH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"umgespielt", bufferH) == OPEN_FOUND);
+
+    /* -eln/-ern weak-verb participles (algorithm fix). The participle ends in
+     * stem+t, so the infinitive must be reconstructed with stem+n, not
+     * stem+en. Without the fix the rule would probe abhandelen (wrong) and
+     * miss. */
+    assert(ICGEOSpl((unsigned char *)"abgehandelt", bufferH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"umgewandelt", bufferH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"angesteuert", bufferH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"gehandelt", bufferH) == OPEN_FOUND);
+
+    /* durchgef\x9fhrt is rescued by the compound rule (durch + gef\x9fhrt);
+     * guards that path against regression when the new participle rule is
+     * added for durch. */
+    assert(ICGEOSpl((unsigned char *)"durchgef" "\x9f" "hrt", bufferH) == OPEN_FOUND);
+
+    /* Noun-plural umlaut reconstructions (new bounded probe). Umlaut-only
+     * plurals (M\x9ftter, V\x8ater) need the new full-word de-umlaut path;
+     * umlaut-plus-suffix plurals are already handled by the existing
+     * stem-de-umlaut path and are kept as regression guards. */
+    assert(ICGEOSpl((unsigned char *)"m" "\x9f" "tter", bufferH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"v" "\x8a" "ter", bufferH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"h" "\x8a" "user", bufferH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"st" "\x8a" "be", bufferH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"b" "\x9f" "cher", bufferH) == OPEN_FOUND);
+    assert(ICGEOSpl((unsigned char *)"m" "\x8a" "nner", bufferH) == OPEN_FOUND);
+
+    /* Nonsense strings must stay rejected even with German morphology. */
+    assert(ICGEOSpl((unsigned char *)"zzzzzzzz", bufferH) == OPEN_NOT_FOUND);
+    assert(ICGEOSpl((unsigned char *)"qxq" "\x8a" "rger", bufferH) == OPEN_NOT_FOUND);
+
+    /* The documented false-accept case stays bounded. */
+    assert(ICGEOSpl((unsigned char *)"stadts", bufferH) == OPEN_FOUND);
+
+    ICGEOSplExitICBuff(bufferH); MemFree(bufferH);
+    puts("morphology adapter checks passed");
+}
+
 /* Always run fault fixtures; optionally add whole-path release regressions. */
 int main(int argc, char **argv)
 {
     assert(argc <= 2);
+    /* Run morphology first from a clean personal-dict state so the German
+     * fixture does not interact with the corruption/recovery flow in
+     * testFixtures. */
+    testMorphology();
     testFixtures();
     if (argc == 2) {
         testRealDictionaries(argv[1]);
