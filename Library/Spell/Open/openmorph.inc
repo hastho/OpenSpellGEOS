@@ -701,14 +701,19 @@ static int OL_CALL olMorphTryLeft(OLContext *lexP,
  * Tries the empty linker first, then linkers in cost order. Collects at
  * most OL_MORPH_MAX_CANDIDATES valid candidates and accepts the lowest
  * cost. The right head is validated exactly (with noun-ending strip).
- * No linker is stripped from the right part. */
+ * No linker is stripped from the right part. German uses the full linker
+ * table (Fugenelemente); other languages use only LINK_NONE because their
+ * compounds do not use German-style linking elements and the linker
+ * patterns cause false splits (e.g. English "cosspud" -> cos+s+pud). */
 static int OL_CALL olMorphCompound(OLContext *lexP,
                                     const unsigned char *wordP,
                                     unsigned short length,
-                                    OLMorphWorkspace *workP)
+                                    OLMorphWorkspace *workP,
+                                    unsigned char language)
 {
     unsigned short split;
     unsigned short linkerIndex;
+    unsigned short linkerLimit;
     unsigned short rightStart;
     unsigned short rightLen;
     unsigned short bestCost;
@@ -718,6 +723,9 @@ static int OL_CALL olMorphCompound(OLContext *lexP,
     if (length < 2 * OL_MORPH_MIN_PART) {
         return 0;
     }
+    /* Only German uses the Fugenelemente linker table. Other languages
+     * use only the empty linker (LINK_NONE, index 0). */
+    linkerLimit = (language == OL_MORPH_LANG_GERMAN) ? OL_MORPH_LINKER_COUNT : 1;
     bestCost = 255;
     candidateCount = 0;
 
@@ -725,7 +733,7 @@ static int OL_CALL olMorphCompound(OLContext *lexP,
          split <= length - OL_MORPH_MIN_PART && candidateCount < OL_MORPH_MAX_CANDIDATES;
          ++split) {
         for (linkerIndex = 0;
-             linkerIndex < OL_MORPH_LINKER_COUNT &&
+             linkerIndex < linkerLimit &&
              candidateCount < OL_MORPH_MAX_CANDIDATES;
              ++linkerIndex) {
             if (!olMorphTryLeft(lexP, wordP, length, split,
@@ -762,9 +770,11 @@ static int OL_CALL olMorphCompound(OLContext *lexP,
  * GEOS StandardLanguage code from the active dictionary. German-specific
  * rules (inflectional endings, -bar, -ung, -keit, -heit, separable-prefix
  * participles, de-umlaut) run only for SL_GERMAN (6). The compound splitter
- * and the un- prefix are language-agnostic. Returns one when a bounded
- * reconstruction finds a stored base, zero when the spelling stays unknown,
- * -1 on malformed data or I/O failure. */
+ * runs for all languages but uses the German linker table (Fugenelemente)
+ * only for German; other languages use the empty linker only. The un- prefix
+ * is language-agnostic. Returns one when a bounded reconstruction finds a
+ * stored base, zero when the spelling stays unknown, -1 on malformed data
+ * or I/O failure. */
 int OL_CALL olMorphCheck(OLContext *lexP, const unsigned char *wordP,
                          unsigned short length, OLMorphWorkspace *workP,
                          unsigned char language)
@@ -778,7 +788,7 @@ int OL_CALL olMorphCheck(OLContext *lexP, const unsigned char *wordP,
     if (probe != 0) {
         return probe;
     }
-    return olMorphCompound(lexP, wordP, length, workP);
+    return olMorphCompound(lexP, wordP, length, workP, language);
 }
 
 #endif

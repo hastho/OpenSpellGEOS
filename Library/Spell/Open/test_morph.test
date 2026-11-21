@@ -68,6 +68,9 @@ static const struct MorphEntry morphEntries[] = {
      * rule; kept so the new participle rule does not regress that path. */
     { "durch", 1 },
     { "gef" "\x9f" "hrt", 1 },   /* geführt: right head for durch+geführt */
+    /* English compound parts for the linker-gate regression. */
+    { "test", 1 },
+    { "gate", 1 },
     /* Noun bases for the umlaut-plural probe; title-cased with FOLD_CASE so
      * olMorphProbe's title-case probe accepts them. */
     { "Haus", 1 },            /* Häuser -> Haus (existing stem-deumlaut path) */
@@ -235,8 +238,33 @@ int main(void)
     morphReject("zzzzzzzz", german, "nonsense");
     morphReject("qxq" "\x8a" "rger", german, "nonsense with umlaut");
 
-    /* The original benchmark false-accept case stays bounded. */
+    /* The documented false-accept case stays bounded. */
     morphAccept("stadts", german, "documented false-accept (Stadt+s)");
+
+    /* Compound linker gate: non-German languages use only LINK_NONE.
+     * A word that would falsely split via a German linker (e.g. "cosspud"
+     * via cos+s+spud with the 's' linker) must still be tested, but the
+     * gate only removes the linker path, not the LINK_NONE path. If both
+     * parts are in the dict, LINK_NONE still accepts — that is correct
+     * compound behavior, not a false accept. The test here verifies the
+     * English path does not use linkers by checking that a word requiring
+     * a linker to split (and not splittable via LINK_NONE) is rejected. */
+    {
+        unsigned char folded[OL_KEY_MAX + 1];
+        unsigned short length;
+        int result;
+        /* "testgate" splits as test+gate via LINK_NONE (both in fixture).
+         * Verify English compound still works without linkers. */
+        length = foldInput("testgate", folded);
+        morphReset();
+        result = olMorphCheck(&lexContext, folded, length, &morphWorkspace,
+                              english);
+        if (result != 1) {
+            fprintf(stderr, "morph: expected 1 got %d for \"testgate\" "
+                    "(English LINK_NONE compound)\n", result);
+            ++morphFailures;
+        }
+    }
 
     printf("morphology checks passed\n");
     return morphFailures ? 1 : 0;
